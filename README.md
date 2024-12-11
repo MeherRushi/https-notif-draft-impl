@@ -72,7 +72,7 @@ ame machine for client and erver, o I ill run  2 core each
 
 ## 100 client(go routine)
 
-## Flak:
+## Flask:
 ```
 gunicorn -w 5 --certfile=../../certs/server.crt --keyfile=../../certs/server.key -b 127.0.0.1:4433 app:app```
 ```
@@ -348,9 +348,9 @@ stddev:			1.628897s
 
 
 
-## 500
+## 500 clients
 
-## Flak
+## Flask
 
 #### get capabilitie
 
@@ -405,8 +405,333 @@ stddev:			109.313ms
 
 #### POST json
 
+```
+Running 30s test @ https://localhost:4433/relay-notification
+  500 goroutine(s) running concurrently
+21613 requests in 30.419528717s, 2.00MB read
+Requests/sec:		710.50
+Transfer/sec:		67.30KB
+Overall Requests/sec:	692.92
+Overall Transfer/sec:	65.64KB
+Fastest Request:	22.123ms
+Avg Req Time:		703.732ms
+Slowest Request:	1.110079s
+Number of Errors:	0
+10%:			80.179ms
+50%:			173.215ms
+75%:			235.383ms
+99%:			296.975ms
+99.9%:			298.063ms
+99.9999%:		298.063ms
+99.99999%:		298.063ms
+stddev:			88.288ms
+```
 
-## 1000
+## fast api
+
+#### get 
+```
+go-wrk -no-vr -c 500 -d 30 -cpus 2 https://localhost:4433/capabilities
+Running 30s test @ https://localhost:4433/capabilities
+  500 goroutine(s) running concurrently
+203692 requests in 30.045083046s, 108.01MB read
+Requests/sec:		6779.55
+Transfer/sec:		3.59MB
+Overall Requests/sec:	6577.40
+Overall Transfer/sec:	3.49MB
+Fastest Request:	14.479ms
+Avg Req Time:		73.751ms
+Slowest Request:	378.127ms
+Number of Errors:	0
+10%:			41.167ms
+50%:			42.551ms
+75%:			42.835ms
+99%:			43.047ms
+99.9%:			43.051ms
+99.9999%:		43.053ms
+99.99999%:		43.053ms
+stddev:			21.448ms
+```
+
+#### POST xml
+
+```
+go-wrk -no-vr -M POST -c 500 -d 30 -cpus 2 -H "Content-Type: application/xml" -body @data.xml  https://localhost:4433/relay-notification
+Running 30s test @ https://localhost:4433/relay-notification
+  500 goroutine(s) running concurrently
+164177 requests in 30.046292769s, 8.77MB read
+Requests/sec:		5464.14
+Transfer/sec:		298.82KB
+Overall Requests/sec:	5339.30
+Overall Transfer/sec:	291.99KB
+Fastest Request:	30.822ms
+Avg Req Time:		91.505ms
+Slowest Request:	378.127ms
+Number of Errors:	0
+10%:			47.111ms
+50%:			52.049ms
+75%:			53.957ms
+99%:			55.531ms
+99.9%:			55.621ms
+99.9999%:		55.631ms
+99.99999%:		55.631ms
+stddev:			20.895ms
+```
+
+#### POST json
+```
+go-wrk -no-vr -M POST -c 500 -d 30 -cpus 2 -H "Content-Type: application/json" -body @data.json  https://localhost:4433/relay-notification
+Running 30s test @ https://localhost:4433/relay-notification
+  500 goroutine(s) running concurrently
+186485 requests in 30.039152981s, 9.96MB read
+Requests/sec:		6208.06
+Transfer/sec:		339.50KB
+Overall Requests/sec:	6075.95
+Overall Transfer/sec:	332.28KB
+Fastest Request:	1.322ms
+Avg Req Time:		80.54ms
+Slowest Request:	498.831ms
+Number of Errors:	0
+10%:			30.131ms
+50%:			32.022ms
+75%:			32.733ms
+99%:			33.175ms
+99.9%:			33.183ms
+99.9999%:		33.187ms
+99.99999%:		33.187ms
+stddev:			38.892ms
+```
+
+## 1000 clients
+
+## Flask
+
+#### get
+```
+go-wrk -no-vr -c 1000 -d 30 -cpus 2 https://localhost:4433/capabilities
+Running 30s test @ https://localhost:4433/capabilities
+  1000 goroutine(s) running concurrently
+22081 requests in 30.888647732s, 7.56MB read
+Requests/sec:		714.86
+Transfer/sec:		250.62KB
+Overall Requests/sec:	672.04
+Overall Transfer/sec:	235.61KB
+Fastest Request:	147.376ms
+Avg Req Time:		1.398878s
+Slowest Request:	2.027711s
+Number of Errors:	0
+10%:			166.951ms
+50%:			265.503ms
+75%:			329.103ms
+99%:			400.383ms
+99.9%:			401.279ms
+99.9999%:		401.279ms
+99.99999%:		401.279ms
+stddev:			265.083ms
+```
+
+#### POST xml
+```
+go-wrk -no-vr -M POST -c 1000 -d 30 -cpus 2 -H "Content-Type: application/xml" -body @data.xml  https://localhost:4433/relay-notification
+Running 30s test @ https://localhost:4433/relay-notification
+  1000 goroutine(s) running concurrently
+20839 requests in 30.881755215s, 1.93MB read
+Requests/sec:		674.80
+Transfer/sec:		63.92KB
+Overall Requests/sec:	635.27
+Overall Transfer/sec:	60.18KB
+Fastest Request:	203.696ms
+Avg Req Time:		1.48192s
+Slowest Request:	1.817599s
+Number of Errors:	0
+10%:			218.303ms
+50%:			313.423ms
+75%:			376.399ms
+99%:			439.439ms
+99.9%:			439.743ms
+99.9999%:		439.743ms
+99.99999%:		439.743ms
+stddev:			208.777ms
+```
+
+#### POST json
+```
+go-wrk -no-vr -M POST -c 1000 -d 30 -cpus 2 -H "Content-Type: application/json" -body @data.json  https://localhost:4433/relay-notification
+Running 30s test @ https://localhost:4433/relay-notification
+  1000 goroutine(s) running concurrently
+21610 requests in 31.009274475s, 2.00MB read
+Requests/sec:		696.89
+Transfer/sec:		66.01KB
+Overall Requests/sec:	651.65
+Overall Transfer/sec:	61.73KB
+Fastest Request:	172.504ms
+Avg Req Time:		1.43495s
+Slowest Request:	2.018111s
+Number of Errors:	0
+10%:			190.239ms
+50%:			300.383ms
+75%:			364.575ms
+99%:			430.623ms
+99.9%:			432.527ms
+99.9999%:		432.527ms
+99.99999%:		432.527ms
+stddev:			231.545ms
+```
+
+## Fast API
+#### get
+```
+go-wrk -no-vr -c 1000 -d 30 -cpus 2 https://localhost:4433/capabilities
+Running 30s test @ https://localhost:4433/capabilities
+  1000 goroutine(s) running concurrently
+203399 requests in 30.080768238s, 107.85MB read
+Requests/sec:		6761.76
+Transfer/sec:		3.59MB
+Overall Requests/sec:	6453.68
+Overall Transfer/sec:	3.42MB
+Fastest Request:	1.646ms
+Avg Req Time:		147.89ms
+Slowest Request:	801.887ms
+Number of Errors:	0
+10%:			90.419ms
+50%:			101.471ms
+75%:			103.267ms
+99%:			104.275ms
+99.9%:			104.307ms
+99.9999%:		104.311ms
+99.99999%:		104.311ms
+stddev:			43.588ms
+```
+
+#### POST xml
+```
+go-wrk -no-vr -M POST -c 1000 -d 30 -cpus 2 -H "Content-Type: application/xml" -body @data.xml  https://localhost:4433/relay-notification
+Running 30s test @ https://localhost:4433/relay-notification
+  1000 goroutine(s) running concurrently
+142449 requests in 29.458154173s, 7.61MB read
+Requests/sec:		4835.64
+Transfer/sec:		264.45KB
+Overall Requests/sec:	4340.39
+Overall Transfer/sec:	237.37KB
+Fastest Request:	113.756ms
+Avg Req Time:		206.797ms
+Slowest Request:	1.931711s
+Number of Errors:	1228
+Error Counts:		net/http: timeout awaiting response headers=1228
+10%:			129.251ms
+50%:			135.415ms
+75%:			136.903ms
+99%:			138.535ms
+99.9%:			138.567ms
+99.9999%:		138.567ms
+99.99999%:		138.567ms
+stddev:			108.013ms
+```
+
+#### POST json
+```
+go-wrk -no-vr -M POST -c 1000 -d 30 -cpus 2 -H "Content-Type: application/json" -body @data.json  https://localhost:4433/relay-notification
+Running 30s test @ https://localhost:4433/relay-notification
+  1000 goroutine(s) running concurrently
+187411 requests in 30.073806246s, 10.01MB read
+Requests/sec:		6231.70
+Transfer/sec:		340.80KB
+Overall Requests/sec:	5948.56
+Overall Transfer/sec:	325.31KB
+Fastest Request:	77.268ms
+Avg Req Time:		160.469ms
+Slowest Request:	806.015ms
+Number of Errors:	0
+10%:			98.027ms
+50%:			104.479ms
+75%:			107.359ms
+99%:			109.215ms
+99.9%:			109.271ms
+99.9999%:		109.275ms
+99.99999%:		109.275ms
+stddev:			39.978ms
+```
+
+---
+
+# Variational requests
 
 
-## 2000
+### lua script for Get variation
+```lua
+-- sequence.lua
+local headers = {
+    ["Accept"] = "application/json"
+}
+
+request = function()
+    local q_value_json = math.random()  -- Random q value between 0 and 1
+    local q_value_xml = math.random()   -- Random q value between 0 and 1
+
+    -- Randomly decide the combination of Accept header
+    local accept_header = ""
+
+    -- Randomly choose between:
+    -- 1. application/json or application/xml with q value
+    -- 2. both application/json and application/xml without q value
+    -- 3. Only one of application/json or application/xml
+
+    local choice = math.random(1, 3)
+    
+    if choice == 1 then
+        -- Include both JSON and XML with q values
+        accept_header = "application/json;q=" .. string.format("%.1f", q_value_json) .. ", application/xml;q=" .. string.format("%.1f", q_value_xml)
+    elseif choice == 2 then
+        -- Include both JSON and XML without q values
+        accept_header = "application/json, application/xml"
+    else
+        -- Randomly choose between JSON or XML alone
+        if math.random() > 0.5 then
+            accept_header = "application/json;q=" .. string.format("%.1f", q_value_json)
+        else
+            accept_header = "application/xml;q=" .. string.format("%.1f", q_value_xml)
+        end
+    end
+
+    -- Set the Accept header for the request
+    headers["Accept"] = accept_header
+    
+    -- Send the GET request to the /capabilities endpoint with the dynamic headers
+    return wrk.format("GET", "/capabilities", headers)
+end
+```
+
+## Flask
+
+#### Sending GET /capabilities with different accept headers
+
+testing done using 4 threads and for 30 secs
+
+#### 10 clients
+
+```
+wrk -t4 -c10 -d30s -s get_seq.lua https://127.0.0.1:4433/capabilities
+Running 30s test @ https://127.0.0.1:4433/capabilities
+  4 threads and 10 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     2.48ms    1.60ms  23.39ms   76.67%
+    Req/Sec   134.90     17.76   171.00     76.00%
+  16160 requests in 30.06s, 5.85MB read
+Requests/sec:    537.67
+Transfer/sec:    199.21KB
+```
+
+#### 100 clients
+```
+wrk -t4 -c100 -d30s -s get_seq.lua https://127.0.0.1:4433/capabilities
+Running 30s test @ https://127.0.0.1:4433/capabilities
+  4 threads and 100 connections
+  Thread Stats   Avg      Stdev     Max   +/- Stdev
+    Latency     3.11ms    1.87ms  31.00ms   70.52%
+    Req/Sec   122.61     49.72   252.00     65.71%
+  14639 requests in 30.08s, 5.30MB read
+Requests/sec:    486.68
+Transfer/sec:    180.34KB
+```
+
+
