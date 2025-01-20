@@ -1014,3 +1014,97 @@ for i, metric, title, ylabel in zip(
 plt.tight_layout()
 plt.show()
 ```
+
+
+
+## more data analysis 
+
+### data
+
+| Bandwidth | Encoding | Requests/sec | Transfer/sec | Throughput (Mbps) |
+|-----------|----------|--------------|--------------|--------------------|
+| 1mbit     | json     | 46.37        | 4.39KB       | 0.54              |
+| 1mbit     | xml      | 46.58        | 4.41KB       | 0.56              |
+| 5mbit     | json     | 232.79       | 22.05KB      | 2.57              |
+| 5mbit     | xml      | 232.89       | 22.06KB      | 2.69              |
+| 10mbit    | json     | 473.28       | 44.83KB      | 4.96              |
+| 10mbit    | xml      | 474.24       | 44.92KB      | 5.21              |
+| 50mbit    | json     | 636.49       | 60.29KB      | 6.48              |
+| 50mbit    | xml      | 627.03       | 59.40KB      | 6.70              |
+| 100mbit   | json     | 636.02       | 60.25KB      | 6.47              |
+| 100mbit   | xml      | 613.22       | 58.09KB      | 6.57              |
+| 500mbit   | json     | 635.00       | 60.15KB      | 6.46              |
+| 500mbit   | xml      | 625.92       | 59.29KB      | 6.70              |
+| 1gbit     | json     | 632.97       | 59.96KB      | 6.44              |
+| 1gbit     | xml      | 625.60       | 59.26KB      | 6.69              |
+
+
+![more data analysis](image-1.png)
+
+### Analysis of Results
+
+1. **Requests/sec**:
+   - JSON and XML show comparable performance across bandwidths.
+   - At higher bandwidths (50mbit and beyond), the number of requests stabilizes, suggesting a bottleneck or saturation in processing capacity.
+
+2. **Transfer/sec (KB)**:
+   - JSON and XML maintain close transfer rates, with XML slightly higher in most cases.
+   - The increase in transfer rates slows as bandwidth grows, further hinting at a system limit.
+
+3. **Throughput (Mbps)**:
+   - Throughput increases with bandwidth but starts plateauing after 10mbit, reaching a maximum of ~6.7 Mbps.
+   - The slight advantage of XML in throughput could be due to minor differences in payload or protocol efficiency.
+
+### Observations
+- **Bandwidth Saturation**: Throughput plateaus beyond 10mbit, suggesting that the system cannot fully utilize the higher bandwidth.
+- **Encoding Impact**: XML performs slightly better in throughput and transfer/sec, possibly due to differences in overhead or compression.
+- **Efficiency Limit**: The system's maximum throughput (~6.7 Mbps) appears constrained by processing, not the available bandwidth.
+
+This data provides insight into the system's performance limits and the comparative efficiency of JSON and XML encodings.
+
+### code
+
+```python
+# Re-importing necessary libraries after reset
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Updated data from the table
+bandwidths = ["1mbit", "5mbit", "10mbit", "50mbit", "100mbit", "500mbit", "1gbit"]
+requests_sec = [
+    [46.37, 46.58], [232.79, 232.89], [473.28, 474.24],
+    [636.49, 627.03], [636.02, 613.22], [635.00, 625.92], [632.97, 625.60]
+]
+transfer_sec_kb = [
+    [4.39, 4.41], [22.05, 22.06], [44.83, 44.92],
+    [60.29, 59.40], [60.25, 58.09], [60.15, 59.29], [59.96, 59.26]
+]
+throughput_mbps = [
+    [0.54, 0.56], [2.57, 2.69], [4.96, 5.21],
+    [6.48, 6.70], [6.47, 6.57], [6.46, 6.70], [6.44, 6.69]
+]
+
+# Prepare the data for plotting
+x = np.arange(len(bandwidths))  # Bandwidth index
+width = 0.35  # Bar width
+
+# Plot Requests/sec, Transfer/sec, and Throughput
+fig, ax = plt.subplots(3, 1, figsize=(12, 18))
+
+for i, metric, title, ylabel in zip(
+    range(3),
+    [requests_sec, transfer_sec_kb, throughput_mbps],
+    ["Requests/sec", "Transfer/sec (KB)", "Throughput (Mbps)"],
+    ["Requests/sec", "KB/sec", "Mbps"]
+):
+    ax[i].bar(x - width / 2, [metric[j][0] for j in range(len(bandwidths))], width, label="JSON")
+    ax[i].bar(x + width / 2, [metric[j][1] for j in range(len(bandwidths))], width, label="XML")
+    ax[i].set_title(title)
+    ax[i].set_xticks(x)
+    ax[i].set_xticklabels(bandwidths, rotation=45)
+    ax[i].set_ylabel(ylabel)
+    ax[i].legend()
+
+plt.tight_layout()
+plt.show()
+```
