@@ -136,7 +136,7 @@ async def respond_with_content_type(accept_header, json_capable, xml_capable, ca
 @app.get("/capabilities")
 async def get_capabilities(request: Request):
     """Handles the /capabilities GET request."""
-
+    
     capabilities_data = await build_capabilities_data(json_capable, xml_capable)
 
     accept_header = request.headers.get(UHTTPS_ACCEPT)

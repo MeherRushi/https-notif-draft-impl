@@ -225,7 +225,6 @@ def record_metrics(response):
         status_code=response.status_code,
         content_type=content_type
     ).inc()
-
     latency = time.time() - request.start_time
     if request.path == '/capabilities' and request.method == 'GET':
         REQUEST_LATENCY_CAPABILITIES.set(latency)

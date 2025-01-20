@@ -37,24 +37,26 @@ end
 -- Generate a random JSON body
 function random_json_body()
     local length = math.random(10, 100) -- Randomize the length of content
-    return string.format('{
-        "ietf-https-notif:notification": {
-            "eventTime": "%s",
-            "event": {
-                "event-class": "fault",
-                "reporting-entity": {
-                    "card": "%s"
-                },
-                "severity": "%s"
-            }
+    return string.format([[
+{
+    "ietf-https-notif:notification": {
+        "eventTime": "%s",
+        "event": {
+            "event-class": "fault",
+            "reporting-entity": {
+                "card": "%s"
+            },
+            "severity": "%s"
         }
-    }', random_event_time(), random_string(length), random_severity())
+    }
+}
+]], random_event_time(), random_string(length), random_severity())
 end
 
 -- Generate a random XML body
 function random_xml_body()
     local length = math.random(10, 100) -- Randomize the length of content
-    return string.format('
+    return string.format([[
 <notification xmlns="urn:ietf:params:xml:ns:netconf:notification:1.0">
   <eventTime>%s</eventTime>
   <event>
@@ -65,7 +67,7 @@ function random_xml_body()
     <severity>%s</severity>
   </event>
 </notification>
-', random_event_time(), random_string(length), random_severity())
+]], random_event_time(), random_string(length), random_severity())
 end
 
 -- Request types
@@ -99,11 +101,13 @@ local request_types = {
     end,
 
     function() -- Malformed XML POST
-        wrk.method = "POST"
-        wrk.path = "/relay-notification"
-        wrk.body = '<notification xmlns="urn:ietf:params:xml:ns:netconf:notification:1.0">
-                      <eventTime>2013-12-21T00:01:00Z</eventTime>' -- Missing closing tags
-        wrk.headers["Content-Type"] = "application/xml"
+    	wrk.method = "POST"
+    	wrk.path = "/relay-notification"
+    	wrk.body = [[
+<notification xmlns="urn:ietf:params:xml:ns:netconf:notification:1.0">
+  <eventTime>2013-12-21T00:01:00Z</eventTime>
+]] -- Missing closing tags
+    	wrk.headers["Content-Type"] = "application/xml"
     end,
 
     function() -- 404 GET request

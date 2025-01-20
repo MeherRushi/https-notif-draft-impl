@@ -1,0 +1,65 @@
+#!/bin/bash
+
+BANDWIDTHS=("1mbit" "5mbit" "10mbit")
+ENCODINGS=("json" "xml")
+BURST="32kbit"
+LATENCY="50ms"
+SERVER_IP="192.168.1.2:8080"
+
+# Print table header
+echo -e "Bandwidth\tEncoding\tRequests/sec\tLatency (ms)\tTransfer/sec\tThroughput (Mbps)"
+
+for bw in "${BANDWIDTHS[@]}"; do
+    echo "Setting bandwidth to $bw with burst $BURST and latency $LATENCY"
+    sudo ip netns exec publisher_ns tc qdisc change dev veth0 root tbf rate $bw burst $BURST latency $LATENCY
+    sudo ip netns exec collector_ns tc qdisc change dev veth1 root tbf rate $bw burst $BURST latency $LATENCY
+
+    for encoding in "${ENCODINGS[@]}"; do
+        if [ "$encoding" == "json" ]; then
+            body_file="data.json"
+            content_type="application/json"
+        else
+            body_file="data.xml"
+            content_type="application/xml"
+        fi
+
+        # Capture initial network stats
+        initial_stats=$(sudo ip netns exec publisher_ns ip -s link show dev veth0)
+
+        # Run the test
+        echo "Testing $encoding at $bw bandwidth"
+        sudo ip netns exec publisher_ns go-wrk -no-vr -M POST -c 100 -d 30 -cpus 2 \
+            -H "Content-Type: $content_type" -body @$body_file \
+            https://${SERVER_IP}/relay-notification > results_${encoding}_${bw}.txt
+
+        # Capture final network stats
+        final_stats=$(sudo ip netns exec publisher_ns ip -s link show dev veth0)
+
+        # Extract metrics from go-wrk result file
+        requests_sec=$(grep "Requests/sec" results_${encoding}_${bw}.txt | awk '{print $2}')
+        latency=$(grep "Latency" results_${encoding}_${bw}.txt | awk '{print $2}')
+        transfer_sec=$(grep "Transfer/sec" results_${encoding}_${bw}.txt | awk '{print $2}')
+
+        # Extract RX bytes from network stats
+        initial_rx_bytes=$(echo "$initial_stats" | grep "RX:" | awk '{print $2}')
+        final_rx_bytes=$(echo "$final_stats" | grep "RX:" | awk '{print $2}')
+
+        # Print extracted values for debugging
+        echo "Initial RX bytes: $initial_rx_bytes"
+        echo "Final RX bytes: $final_rx_bytes"
+
+        # Calculate throughput (in MB)
+        if [[ -n "$initial_rx_bytes" && -n "$final_rx_bytes" ]]; then
+            throughput=$(echo "scale=2; ($final_rx_bytes - $initial_rx_bytes) / 1024 / 1024" | bc)
+        else
+            throughput=0
+        fi
+
+        # Convert throughput to Mbps
+        throughput_mbps=$(echo "scale=2; $throughput * 8" | bc)
+
+        # Print results in a table format
+        echo -e "$bw\t$encoding\t$requests_sec\t$latency\t$transfer_sec\t$throughput_mbps"
+    done
+done
+
