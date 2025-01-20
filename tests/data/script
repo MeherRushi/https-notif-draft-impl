@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BANDWIDTHS=("1mbit" "5mbit" "10mbit")
+BANDWIDTHS=("1mbit" "5mbit" "10mbit" "50mbit" "100mbit" "500mbit" "1gbit")
 ENCODINGS=("json" "xml")
 BURST="32kbit"       # Adjust as per your requirement
 LATENCY="50ms"       # Simulate 50ms network latency
