@@ -77,4 +77,22 @@ Eg for valid xml data
 </notification>
 ```
 
+---
+
+## Setting up Kafka and InfluxDB 
+
+1. Run the following command to set up InfluxDB using Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+2. Go to `localhost:8086` in your browser and sign up.
+   - Org: `NITK`
+   - Bucket: `test`
+
+3. Copy the operator API token and add it to the `kafka_consumer.py` and `read_db.py` files as `INFLUXDB_TOKEN`.
+
+4. Run the `kafka_consumer.py` and `read_db.py` files.
+
 

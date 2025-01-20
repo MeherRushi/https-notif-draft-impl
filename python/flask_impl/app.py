@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify, Response
-from prometheus_client import Counter, Gauge, generate_latest, Histogram
+from prometheus_client import Counter, Gauge, generate_latest 
 import json
 import xmltodict
 import re
@@ -7,6 +7,19 @@ from http import HTTPStatus
 from yangson import DataModel
 from yangson.enumerations import ContentType
 import time
+from confluent_kafka import Producer
+
+
+# Kafka producer configuration
+KAFKA_TOPIC_NAME = 'test-topic'
+producer = Producer({'bootstrap.servers': 'localhost:9092'})
+
+def delivery_report(err, msg):
+    if err:
+        print(f"Message delivery failed: {err}")
+    else:
+        print(f"Message delivered to {msg.topic()} [{msg.partition()}]")
+
 
 # Define constants for the URNs, namespace, and JSON keys
 URN_ENCODING_JSON = "urn:ietf:capability:https-notif-receiver:encoding:json"
@@ -166,6 +179,27 @@ def post_notification():
             return error_message, HTTPStatus.UNSUPPORTED_MEDIA_TYPE
         return error_message, HTTPStatus.BAD_REQUEST
 
+    try: 
+        data_string = request.data.decode('utf-8')
+        if req_content_type == MIME_APPLICATION_JSON:
+            message = json.loads(data_string)
+        elif req_content_type == MIME_APPLICATION_XML:
+            message = xmltodict.parse(data_string, process_namespaces=True)
+            message = strip_namespace(message)
+
+     # Produce message to Kafka 
+        producer.produce(
+            KAFKA_TOPIC_NAME,
+            key=None,
+            value=json.dumps(message),
+            callback=delivery_report
+        )
+        producer.flush()
+        app.logger.info(f"Message sent to Kafka topic '{KAFKA_TOPIC_NAME}': {message}")
+    except Exception as e:
+        app.logger.error(f"Error sending message to Kafka: {e}")
+        return "Internal Server Error", HTTPStatus.INTERNAL_SERVER_ERROR
+    
     POST_BODY_SIZE.set(len(request.data))
     return '', HTTPStatus.NO_CONTENT
 
