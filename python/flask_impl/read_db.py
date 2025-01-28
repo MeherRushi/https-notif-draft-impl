@@ -1,8 +1,13 @@
 from influxdb_client import InfluxDBClient
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env
+load_dotenv()
 
 url = "http://localhost:8086"
-token = ""
-org = "NITK"
+token = os.getenv("INFLUXDB_TOKEN")
+org = os.getenv("INFLUXDB_ORG")
 
 client = InfluxDBClient(url=url, token=token, org=org)
 
