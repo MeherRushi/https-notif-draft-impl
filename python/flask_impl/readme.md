@@ -9,6 +9,9 @@
 
 - We can also generate a certificate using openssl and then use them as mentioned in the reference links (https://blog.miguelgrinberg.com/post/running-your-flask-application-over-https)
 
+```bash
+pip install requirements.txt
+```
 
 - dev
 ```bash
@@ -87,12 +90,15 @@ Eg for valid xml data
 docker-compose up -d
 ```
 
-2. Go to `localhost:8086` in your browser and sign up.
-   - Org: `NITK`
-   - Bucket: `test`
+2. Go to `localhost:8086` in your browser and sign up. 
+   
+3. Copy the `operator API token`, `Org` and `Bucket` and add it to the `.env` file.
 
-3. Copy the operator API token and add it to the `kafka_consumer.py` and `read_db.py` files as `INFLUXDB_TOKEN`.
+4. Run the `kafka_consumer.py` in the background. 
 
-4. Run the `kafka_consumer.py` and `read_db.py` files.
+5. Send some relay-notifications to the collector 
+
+6. To query the tsdb run `read_db.py`
+
 
 

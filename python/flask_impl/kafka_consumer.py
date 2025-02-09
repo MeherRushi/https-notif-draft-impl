@@ -3,6 +3,10 @@ import influxdb_client
 from influxdb_client.client.write_api import SYNCHRONOUS
 from influxdb_client import Point
 import json
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
 
 # Kafka configuration
 KAFKA_BROKER = "localhost:9092"
@@ -19,9 +23,9 @@ consumer = Consumer(consumer_config)
 consumer.subscribe([KAFKA_TOPIC])
 
 INFLUXDB_URL = "http://localhost:8086"
-INFLUXDB_TOKEN = ""
-INFLUXDB_ORG = "NITK"
-INFLUXDB_BUCKET = "test"
+INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
+INFLUXDB_ORG = os.getenv("INFLUXDB_ORG")
+INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")
 
 client = influxdb_client.InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
 write_api = client.write_api(write_options=SYNCHRONOUS)
@@ -47,10 +51,14 @@ def consume_and_insert():
             try:
                 data = json.loads(message)
                 
-                event_time = data.get("ietf-https-notif:notification", {}).get("eventTime", "")
-                event_class = data.get("ietf-https-notif:notification", {}).get("event", {}).get("event-class", "")
-                severity = data.get("ietf-https-notif:notification", {}).get("event", {}).get("severity", "")
-                reporting_entity = data.get("ietf-https-notif:notification", {}).get("event", {}).get("reporting-entity", {}).get("card", "")
+                notification_data = data.get("ietf-https-notif:notification", data.get("notification", {}))
+
+                event_time = notification_data.get("eventTime", "")
+                event = notification_data.get("event", {})
+                event_class = event.get("event-class", "")
+                severity = event.get("severity", "")
+                reporting_entity = event.get("reporting-entity", {}).get("card", "")
+
                 
                 # Create a point for InfluxDB 
                 point = (
