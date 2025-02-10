@@ -1,6 +1,6 @@
 #!/bin/bash
 
-BANDWIDTHS=("1mbit" "5mbit" "10mbit")
+BANDWIDTHS=("1mbit" "5mbit" "10mbit" "50mbit" "100mbit" "500mbit" "1gbit")
 ENCODINGS=("json" "xml")
 BURST="32kbit"       # Adjust as per your requirement
 LATENCY="50ms"       # Simulate 50ms network latency
@@ -10,8 +10,13 @@ SERVER_IP="192.168.1.2:8080"
 
 for bw in "${BANDWIDTHS[@]}"; do
     echo "Setting bandwidth to $bw with burst $BURST and latency $LATENCY"
+
+    # Ensure the qdisc exists by adding it first
+    sudo ip netns exec publisher_ns tc qdisc add dev veth0 root tbf rate $bw burst $BURST latency $LATENCY 2>/dev/null || \
     sudo ip netns exec publisher_ns tc qdisc change dev veth0 root tbf rate $bw burst $BURST latency $LATENCY
-    sudo ip netns exec collector_ns tc qdisc change dev veth1 root tbf rate $bw burst $BURST latency $LATENCY
+
+    sudo ip netns exec collector_ns tc qdisc add dev veth2 root tbf rate $bw burst $BURST latency $LATENCY 2>/dev/null || \
+    sudo ip netns exec collector_ns tc qdisc change dev veth2 root tbf rate $bw burst $BURST latency $LATENCY
 
     for encoding in "${ENCODINGS[@]}"; do
         if [ "$encoding" == "json" ]; then
