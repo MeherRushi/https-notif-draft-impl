@@ -701,6 +701,79 @@ request = function()
 end
 ```
 
+### lua script for sequence of packets being sent
+```lua
+-- Persistent counter for each thread
+local counter = 0
+
+-- Initialize the thread
+function init(args)
+    counter = 0  -- Start the counter at 0 for each thread
+end
+
+-- Request sequence logic
+function request()
+    counter = counter + 1  -- Increment the counter for each request
+
+    -- Handle the sequence of requests
+    if counter == 1 then
+        wrk.method = "GET"
+        wrk.path = "/capabilities"
+        return wrk.format(nil)
+    elseif counter == 2 then
+        wrk.method = "POST"
+        wrk.path = "/relay-notification"
+        wrk.body = '{"ietf-https-notif:notification": {"eventTime": "2013-12-21T00:01:00Z", "event": {"event-class": "fault", "reporting-entity": {"card": "Ethernet0"}, "severity": "major"}}}'
+        wrk.headers["Content-Type"] = "application/json"
+        return wrk.format(nil)
+    elseif counter == 3 then
+        wrk.method = "POST"
+        wrk.path = "/relay-notification"
+        wrk.body = '{"ietf-https-notif:notification": {"eventTime": "2013-12-21T00:01:00Z", "event": {"event-class": "fault"}}'  -- Malformed JSON
+        wrk.headers["Content-Type"] = "application/json"
+        return wrk.format(nil)
+    elseif counter == 4 then
+        wrk.method = "POST"
+        wrk.path = "/relay-notification"
+        wrk.body = [[
+<notification xmlns="urn:ietf:params:xml:ns:netconf:notification:1.0">
+  <eventTime>2013-12-21T00:01:00Z</eventTime>
+  <event>
+    <event-class>fault</event-class>
+    <reporting-entity>
+      <card>Ethernet0</card>
+    </reporting-entity>
+    <severity>major</severity>
+  </event>
+</notification>
+]]
+        wrk.headers["Content-Type"] = "application/xml"
+        return wrk.format(nil)
+    elseif counter == 5 then
+        wrk.method = "POST"
+        wrk.path = "/relay-notification"
+        wrk.body = [[
+<notification xmlns="urn:ietf:params:xml:ns:netconf:notification:1.0">
+  <eventTime>2013-12-21T00:01:00Z</eventTime>
+  <event>
+    <event-class>fault</event-class>
+    <reporting-entity>
+      <card>Ethernet0</card>
+    </reporting-entity>
+]]  -- Malformed XML
+        wrk.headers["Content-Type"] = "application/xml"
+        return wrk.format(nil)
+    elseif counter == 6 then
+        wrk.method = "GET"
+        wrk.path = "/nonexistent-endpoint"
+        return wrk.format(nil)
+    else
+        counter = 0  -- Reset the counter after the last request
+        return request()  -- Restart the sequence
+    end
+end
+```
+
 ## Flask
 
 #### Sending GET /capabilities with different accept headers
@@ -734,4 +807,304 @@ Requests/sec:    486.68
 Transfer/sec:    180.34KB
 ```
 
+#### 500 clients
 
+
+-----
+
+
+# Bandwidth Testing
+
+> Rough Docs
+
+### Summary of the Test Environment Setup
+
+#### 1. **Network Namespace Setup**
+- We create two network namespaces: `publisher_ns` (client) and `collector_ns` (server). These namespaces simulate isolated environments to mimic a real-world client-server interaction.
+- A virtual Ethernet pair (`veth0` and `veth1`) connects these namespaces, where `veth0` resides in `publisher_ns` and `veth1` resides in `collector_ns`.
+- The virtual Ethernet interfaces are configured with appropriate IP addresses, enabling communication between the namespaces.
+
+#### 2. **Running the Collector**
+- The server application (referred to as the collector) is hosted in the `collector_ns` namespace, listening on a predefined IP and port (e.g., `192.168.1.2:8080`).
+- This setup allows the publisher in `publisher_ns` to send HTTP requests to the collector over the virtual Ethernet link.
+
+#### 3. **Script to Change Bandwidth and Run Tests**
+- The provided script automates bandwidth control, HTTP request generation, and throughput measurement:
+  1. **Bandwidth Control**: The `tc` (traffic control) command is used to set bandwidth limits (`1mbit`, `5mbit`, `10mbit`) on the virtual Ethernet interfaces (`veth0` and `veth1`). The command applies a Token Bucket Filter (TBF) queuing discipline to simulate constrained network conditions with a specified burst size (`32kbit`) and latency (`50ms`).
+  2. **Request Generation**: The script uses `go-wrk`, a benchmarking tool, to send HTTP POST requests from `publisher_ns` to `collector_ns`. It supports JSON and XML payloads, specified by the `ENCODINGS` array.
+  3. **Traffic Measurement**: The script captures the number of transmitted bytes (`TX bytes`) on `veth0` in `publisher_ns` before and after running the test using the `ip -s link show` command.
+
+#### 4. **Calculating Throughput**
+- **TX Bytes Measurement**: The script calculates the difference in transmitted bytes (`TX bytes`) on `veth0` before and after the test.
+- **Throughput Formula**: 
+  \[
+  \text{Throughput (Mbps)} = \frac{(\text{TX End} - \text{TX Start}) \times 8}{\text{Test Duration (30 seconds)} \times 1024 \times 1024}
+  \]
+  This formula converts the transmitted data from bytes to megabits per second.
+
+#### 5. **Output**
+- The script generates a table summarizing the results:
+  - **Bandwidth**: Bandwidth limit applied to the link.
+  - **Encoding**: Payload format (`json` or `xml`).
+  - **Requests/sec**: HTTP requests processed per second (from `go-wrk` output).
+  - **Transfer/sec**: Amount of data transferred per second (e.g., in KB/sec).
+  - **Throughput (Mbps)**: Effective data transfer rate over the link.
+
+### Script Workflow
+- Bandwidth and encoding configurations are iteratively applied.
+- HTTP requests are sent using `go-wrk`, and results are parsed to extract `Requests/sec` and `Transfer/sec`.
+- TX bytes are captured before and after each test, and throughput is calculated.
+- Results are printed in a tabular format for analysis.
+
+
+
+## Setup commands:
+
+```bash
+sudo ip netns add publisher_ns
+sudo ip netns add collector_ns
+
+sudo ip link add veth0 type veth peer name veth1
+sudo ip link set veth0 netns publisher_ns
+sudo ip link set veth1 netns collector_ns
+
+sudo ip netns exec publisher_ns ip addr add 192.168.1.1/24 dev veth0
+sudo ip netns exec collector_ns ip addr add 192.168.1.2/24 dev veth1
+sudo ip netns exec publisher_ns ip link set veth0 up
+sudo ip netns exec collector_ns ip link set veth1 up
+sudo ip netns exec publisher_ns ip link set lo up
+sudo ip netns exec collector_ns ip link set lo up
+```
+
+## script 
+
+```bash
+#!/bin/bash
+
+BANDWIDTHS=("1mbit" "5mbit" "10mbit")
+ENCODINGS=("json" "xml")
+BURST="32kbit"       # Adjust as per your requirement
+LATENCY="50ms"       # Simulate 50ms network latency
+
+# IP address of the collector (server) namespace
+SERVER_IP="192.168.1.2:8080"
+
+# Header for the table
+echo -e "Bandwidth\tEncoding\tRequests/sec\tTransfer/sec\tThroughput (Mbps)"
+
+for bw in "${BANDWIDTHS[@]}"; do
+    sudo ip netns exec publisher_ns tc qdisc change dev veth0 root tbf rate $bw burst $BURST latency $LATENCY
+    sudo ip netns exec collector_ns tc qdisc change dev veth1 root tbf rate $bw burst $BURST latency $LATENCY
+
+    for encoding in "${ENCODINGS[@]}"; do
+        if [ "$encoding" == "json" ]; then
+            body_file="data.json"
+            content_type="application/json"
+        else
+            body_file="data.xml"
+            content_type="application/xml"
+        fi
+
+	# Capture TX bytes before the test
+	tx_start=$(sudo ip netns exec publisher_ns ip -s link show dev veth0 | awk '/TX:/ {getline; print $1}')
+
+	# Run go-wrk and capture the results
+	result=$(sudo ip netns exec publisher_ns go-wrk -no-vr -M POST -c 100 -d 30 -cpus 2 \
+    		-H "Content-Type: $content_type" -body @$body_file \
+    		https://${SERVER_IP}/relay-notification)
+
+	# Capture TX bytes after the test
+	tx_end=$(sudo ip netns exec publisher_ns ip -s link show dev veth0 | awk '/TX:/ {getline; print $1}')
+
+
+	# Extract values using regex or text processing
+        requests_sec=$(echo "$result" | grep -oP 'Overall Requests/sec:\s+\K[\d.]+')
+	transfer_sec=$(echo "$result" | grep -oP 'Overall Transfer/sec:\s+\K[\d.]+[A-Za-z]+')
+
+	throughput_mbps=$(echo "scale=2; (($tx_end - $tx_start) * 8) / (30 * 1024 * 1024)" | bc)
+
+        # Output the results in a tabular format
+        echo -e "$bw\t$encoding\t$requests_sec\t$transfer_sec\t$throughput_mbps"
+    done
+done
+```
+## Results
+
+| Bandwidth | Encoding | Requests/sec | Transfer/sec | Throughput (Mbps) |
+|-----------|----------|--------------|--------------|--------------------|
+| 1mbit     | json     | 46.52        | 4.41KB       | 0.54              |
+| 1mbit     | xml      | 46.46        | 4.40KB       | 0.57              |
+| 5mbit     | json     | 232.79       | 22.05KB      | 2.56              |
+| 5mbit     | xml      | 232.73       | 22.05KB      | 2.69              |
+| 10mbit    | json     | 473.87       | 44.89KB      | 4.96              |
+| 10mbit    | xml      | 474.16       | 44.92KB      | 5.21              |
+
+### minor issues
+- running gunicorn in the collector_ns was running into some issues
+- accessing the go-wrk binary from a different ns
+- parsing the output and throughput calculation and data collection
+
+### some terms
+Requests/sec: How many requests are being sent per second.
+Transfer/sec: How much data is being transferred every second.
+Throughput: The actual data transfer rate over the network (in Mbps or MBps).
+
+# Analysis
+
+![graphs](image.png)
+The graphs above analyze the performance metrics across different bandwidths and encodings. Here's a summary of the insights:
+
+### Observations:
+1. **Requests/sec**:
+   - Both JSON and XML encodings show a proportional increase in the number of requests processed per second as bandwidth increases.
+   - The performance difference between JSON and XML is negligible, indicating similar processing times for these encodings.
+
+2. **Transfer/sec (KB)**:
+   - Transfer rates increase linearly with bandwidth, reflecting that more data can be transferred as bandwidth improves.
+   - Again, JSON and XML have nearly identical transfer rates, suggesting minimal impact of encoding type on data transfer volume.
+
+3. **Throughput (Mbps)**:
+   - Throughput also scales with bandwidth but remains below the theoretical maximum for each bandwidth tier.
+   - XML consistently achieves slightly higher throughput than JSON, which might be attributed to its marginally larger data size resulting in slightly higher utilization.
+
+### Key Takeaways:
+- The system scales well with bandwidth, maintaining a proportional increase in performance metrics.
+- Differences between JSON and XML are minor, with XML slightly outperforming JSON in throughput, likely due to larger payloads per request.
+- The throughput achieved is less than the maximum bandwidth, indicating some overhead or limitations in network or application processing efficiency.
+
+
+### code
+```python
+import matplotlib.pyplot as plt
+import numpy as np
+
+
+# Data from the table
+bandwidths = ["1mbit", "5mbit", "10mbit"]
+encodings = ["json", "xml"]
+requests_sec = [[46.52, 46.46], [232.79, 232.73], [473.87, 474.16]]
+transfer_sec_kb = [[4.41, 4.40], [22.05, 22.05], [44.89, 44.92]]
+throughput_mbps = [[0.54, 0.57], [2.56, 2.69], [4.96, 5.21]]
+
+
+# Prepare the data for plotting
+x = np.arange(len(bandwidths))  # Bandwidth index
+width = 0.35  # Bar width
+
+
+# Plot Requests/sec
+fig, ax = plt.subplots(3, 1, figsize=(10, 15))
+
+
+for i, metric, title, ylabel in zip(
+    range(3),
+    [requests_sec, transfer_sec_kb, throughput_mbps],
+    ["Requests/sec", "Transfer/sec (KB)", "Throughput (Mbps)"],
+    ["Requests/sec", "KB/sec", "Mbps"]
+):
+    ax[i].bar(x - width / 2, [metric[j][0] for j in range(len(bandwidths))], width, label="JSON")
+    ax[i].bar(x + width / 2, [metric[j][1] for j in range(len(bandwidths))], width, label="XML")
+    ax[i].set_title(title)
+    ax[i].set_xticks(x)
+    ax[i].set_xticklabels(bandwidths)
+    ax[i].set_ylabel(ylabel)
+    ax[i].legend()
+
+
+plt.tight_layout()
+plt.show()
+```
+
+
+
+## more data analysis 
+
+### data
+
+| Bandwidth | Encoding | Requests/sec | Transfer/sec | Throughput (Mbps) |
+|-----------|----------|--------------|--------------|--------------------|
+| 1mbit     | json     | 46.37        | 4.39KB       | 0.54              |
+| 1mbit     | xml      | 46.58        | 4.41KB       | 0.56              |
+| 5mbit     | json     | 232.79       | 22.05KB      | 2.57              |
+| 5mbit     | xml      | 232.89       | 22.06KB      | 2.69              |
+| 10mbit    | json     | 473.28       | 44.83KB      | 4.96              |
+| 10mbit    | xml      | 474.24       | 44.92KB      | 5.21              |
+| 50mbit    | json     | 636.49       | 60.29KB      | 6.48              |
+| 50mbit    | xml      | 627.03       | 59.40KB      | 6.70              |
+| 100mbit   | json     | 636.02       | 60.25KB      | 6.47              |
+| 100mbit   | xml      | 613.22       | 58.09KB      | 6.57              |
+| 500mbit   | json     | 635.00       | 60.15KB      | 6.46              |
+| 500mbit   | xml      | 625.92       | 59.29KB      | 6.70              |
+| 1gbit     | json     | 632.97       | 59.96KB      | 6.44              |
+| 1gbit     | xml      | 625.60       | 59.26KB      | 6.69              |
+
+
+![more data analysis](image-1.png)
+
+### Analysis of Results
+
+1. **Requests/sec**:
+   - JSON and XML show comparable performance across bandwidths.
+   - At higher bandwidths (50mbit and beyond), the number of requests stabilizes, suggesting a bottleneck or saturation in processing capacity.
+
+2. **Transfer/sec (KB)**:
+   - JSON and XML maintain close transfer rates, with XML slightly higher in most cases.
+   - The increase in transfer rates slows as bandwidth grows, further hinting at a system limit.
+
+3. **Throughput (Mbps)**:
+   - Throughput increases with bandwidth but starts plateauing after 10mbit, reaching a maximum of ~6.7 Mbps.
+   - The slight advantage of XML in throughput could be due to minor differences in payload or protocol efficiency.
+
+### Observations
+- **Bandwidth Saturation**: Throughput plateaus beyond 10mbit, suggesting that the system cannot fully utilize the higher bandwidth.
+- **Encoding Impact**: XML performs slightly better in throughput and transfer/sec, possibly due to differences in overhead or compression.
+- **Efficiency Limit**: The system's maximum throughput (~6.7 Mbps) appears constrained by processing, not the available bandwidth.
+
+This data provides insight into the system's performance limits and the comparative efficiency of JSON and XML encodings.
+
+### code
+
+```python
+# Re-importing necessary libraries after reset
+import numpy as np
+import matplotlib.pyplot as plt
+
+# Updated data from the table
+bandwidths = ["1mbit", "5mbit", "10mbit", "50mbit", "100mbit", "500mbit", "1gbit"]
+requests_sec = [
+    [46.37, 46.58], [232.79, 232.89], [473.28, 474.24],
+    [636.49, 627.03], [636.02, 613.22], [635.00, 625.92], [632.97, 625.60]
+]
+transfer_sec_kb = [
+    [4.39, 4.41], [22.05, 22.06], [44.83, 44.92],
+    [60.29, 59.40], [60.25, 58.09], [60.15, 59.29], [59.96, 59.26]
+]
+throughput_mbps = [
+    [0.54, 0.56], [2.57, 2.69], [4.96, 5.21],
+    [6.48, 6.70], [6.47, 6.57], [6.46, 6.70], [6.44, 6.69]
+]
+
+# Prepare the data for plotting
+x = np.arange(len(bandwidths))  # Bandwidth index
+width = 0.35  # Bar width
+
+# Plot Requests/sec, Transfer/sec, and Throughput
+fig, ax = plt.subplots(3, 1, figsize=(12, 18))
+
+for i, metric, title, ylabel in zip(
+    range(3),
+    [requests_sec, transfer_sec_kb, throughput_mbps],
+    ["Requests/sec", "Transfer/sec (KB)", "Throughput (Mbps)"],
+    ["Requests/sec", "KB/sec", "Mbps"]
+):
+    ax[i].bar(x - width / 2, [metric[j][0] for j in range(len(bandwidths))], width, label="JSON")
+    ax[i].bar(x + width / 2, [metric[j][1] for j in range(len(bandwidths))], width, label="XML")
+    ax[i].set_title(title)
+    ax[i].set_xticks(x)
+    ax[i].set_xticklabels(bandwidths, rotation=45)
+    ax[i].set_ylabel(ylabel)
+    ax[i].legend()
+
+plt.tight_layout()
+plt.show()
+```

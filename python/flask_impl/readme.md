@@ -9,6 +9,9 @@
 
 - We can also generate a certificate using openssl and then use them as mentioned in the reference links (https://blog.miguelgrinberg.com/post/running-your-flask-application-over-https)
 
+```bash
+pip install requirements.txt
+```
 
 - dev
 ```bash
@@ -76,5 +79,26 @@ Eg for valid xml data
   </event>
 </notification>
 ```
+
+---
+
+## Setting up Kafka and InfluxDB 
+
+1. Run the following command to set up InfluxDB using Docker Compose:
+
+```bash
+docker-compose up -d
+```
+
+2. Go to `localhost:8086` in your browser and sign up. 
+   
+3. Copy the `operator API token`, `Org` and `Bucket` and add it to the `.env` file.
+
+4. Run the `kafka_consumer.py` in the background. 
+
+5. Send some relay-notifications to the collector 
+
+6. To query the tsdb run `read_db.py`
+
 
 

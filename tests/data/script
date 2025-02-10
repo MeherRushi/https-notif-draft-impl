@@ -1,0 +1,49 @@
+#!/bin/bash
+
+BANDWIDTHS=("1mbit" "5mbit" "10mbit" "50mbit" "100mbit" "500mbit" "1gbit")
+ENCODINGS=("json" "xml")
+BURST="32kbit"       # Adjust as per your requirement
+LATENCY="50ms"       # Simulate 50ms network latency
+
+# IP address of the collector (server) namespace
+SERVER_IP="192.168.1.2:8080"
+
+# Header for the table
+echo -e "Bandwidth\tEncoding\tRequests/sec\tTransfer/sec\tThroughput (Mbps)"
+
+for bw in "${BANDWIDTHS[@]}"; do
+    sudo ip netns exec publisher_ns tc qdisc change dev veth0 root tbf rate $bw burst $BURST latency $LATENCY
+    sudo ip netns exec collector_ns tc qdisc change dev veth1 root tbf rate $bw burst $BURST latency $LATENCY
+
+    for encoding in "${ENCODINGS[@]}"; do
+        if [ "$encoding" == "json" ]; then
+            body_file="data.json"
+            content_type="application/json"
+        else
+            body_file="data.xml"
+            content_type="application/xml"
+        fi
+
+	# Capture TX bytes before the test
+	tx_start=$(sudo ip netns exec publisher_ns ip -s link show dev veth0 | awk '/TX:/ {getline; print $1}')
+
+	# Run go-wrk and capture the results
+	result=$(sudo ip netns exec publisher_ns go-wrk -no-vr -M POST -c 100 -d 30 -cpus 2 \
+    		-H "Content-Type: $content_type" -body @$body_file \
+    		https://${SERVER_IP}/relay-notification)
+
+	# Capture TX bytes after the test
+	tx_end=$(sudo ip netns exec publisher_ns ip -s link show dev veth0 | awk '/TX:/ {getline; print $1}')
+
+
+	# Extract values using regex or text processing
+        requests_sec=$(echo "$result" | grep -oP 'Overall Requests/sec:\s+\K[\d.]+')
+	transfer_sec=$(echo "$result" | grep -oP 'Overall Transfer/sec:\s+\K[\d.]+[A-Za-z]+')
+
+	throughput_mbps=$(echo "scale=2; (($tx_end - $tx_start) * 8) / (30 * 1024 * 1024)" | bc)
+
+        # Output the results in a tabular format
+        echo -e "$bw\t$encoding\t$requests_sec\t$transfer_sec\t$throughput_mbps"
+    done
+done
+

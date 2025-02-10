@@ -1,10 +1,24 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
+from prometheus_client import Counter, Gauge, generate_latest 
 import json
 import xmltodict
 import re
 from http import HTTPStatus
 from yangson import DataModel
 from yangson.enumerations import ContentType
+import time
+from confluent_kafka import Producer
+
+
+# Kafka producer configuration
+KAFKA_TOPIC_NAME = 'test-topic'
+producer = Producer({'bootstrap.servers': 'localhost:9092'})
+
+def delivery_report(err, msg):
+    if err:
+        print(f"Message delivery failed: {err}")
+    else:
+        print(f"Message delivered to {msg.topic()} [{msg.partition()}]")
 
 
 # Define constants for the URNs, namespace, and JSON keys
@@ -15,7 +29,6 @@ JSON_RECEIVER_CAPABILITY = "receiver-capability"
 UHTTPS_CONTENT_TYPE = 'Content-Type'
 UHTTPS_ACCEPT = 'Accept'
 
-
 # Define constants for media types
 MIME_APPLICATION_XML = "application/xml"
 MIME_APPLICATION_JSON = "application/json"
@@ -25,20 +38,19 @@ json_capable = True
 xml_capable = True
 
 # Define your YANG module path and model name
-yang_dir_path = "../../yang_modules/" 
-yang_library_path = "../../yang_modules/yang-library.json" 
+yang_dir_path = "../../yang_modules/"
+yang_library_path = "../../yang_modules/yang-library.json"
 
 app = Flask(__name__)
 
 # Initialize the YANG data model
-data_model = DataModel.from_file(yang_library_path,[yang_dir_path])
+data_model = DataModel.from_file(yang_library_path, [yang_dir_path])
 
 # Custom function to remove namespaces from XML keys
 def strip_namespace(data):
     if isinstance(data, dict):
         new_data = {}
         for key, value in data.items():
-            # Remove namespace prefix
             stripped_key = key.split(':')[-1] if ':' in key else key
             new_data[stripped_key] = strip_namespace(value)
         return new_data
@@ -48,31 +60,32 @@ def strip_namespace(data):
         return data
 
 def validate_relay_notif(data_string):
+    req_content_type = request.headers.get(UHTTPS_CONTENT_TYPE)
     try:
-        # Try to parse the data string as JSON
-        json_data = json.loads(data_string)
-    except json.JSONDecodeError:
-        # If JSON parsing fails, assume the data is XML and parse it
-        try:
+        if req_content_type == MIME_APPLICATION_JSON:
+            json_data = json.loads(data_string)
+        elif req_content_type == MIME_APPLICATION_XML:
             parsed_xml = xmltodict.parse(data_string, process_namespaces=True)
             parsed_xml = strip_namespace(parsed_xml)
-            # Restructure
             json_data = {
                 "ietf-https-notif:notification": {
                     "eventTime": parsed_xml["notification"]["eventTime"],
                     "event": parsed_xml["notification"]["event"]
                 }
             }
-        except Exception as e:
-            return 0
-            
-    # Validate the parsed JSON data against the YANG model
+        else:
+            return 0, "Invalid Content-Type"
+    except Exception as e:
+        app.logger.error(f"Parsing error: {e}")
+        return 0, "Parsing error: invalid data format"
+
     try:
         instance = data_model.from_raw(json_data)
         instance.validate(ctype=ContentType.all)
-        return 1
+        return 1, None
     except Exception as e:
-        return 0
+        app.logger.error(f"Validation error: {e}")
+        return 0, "Validation error: data does not conform to the YANG module"
 
 def build_capabilities_data(json_capable, xml_capable):
     capabilities_data = []
@@ -120,7 +133,7 @@ def respond_with_content_type(accept_header, json_capable, xml_capable, capabili
     q_xml = get_q_value(accept_header, MIME_APPLICATION_XML)
     q_json = get_q_value(accept_header, MIME_APPLICATION_JSON)
 
-    if q_xml < 0 or q_json < 0 or q_xml > 1 or q_json > 1: 
+    if q_xml < 0 or q_json < 0 or q_xml > 1 or q_json > 1:
         return jsonify({"error": "Invalid q value"}), HTTPStatus.BAD_REQUEST
 
     if q_json == 0 and q_xml == 0:
@@ -137,7 +150,6 @@ def respond_with_content_type(accept_header, json_capable, xml_capable, capabili
 @app.route('/capabilities', methods=['GET'])
 def get_capabilities():
     """Handles the /capabilities GET request."""
-
     capabilities_data = build_capabilities_data(json_capable, xml_capable)
 
     accept_header = request.headers.get(UHTTPS_ACCEPT)
@@ -148,31 +160,85 @@ def get_capabilities():
 
 @app.route('/relay-notification', methods=['POST'])
 def post_notification():
-    # Get the Content-Type of the request
     req_content_type = request.headers.get(UHTTPS_CONTENT_TYPE)
 
-    if req_content_type == None:
+    if req_content_type is None:
         return "Content-type is None -> Empty Body Notification", HTTPStatus.UNSUPPORTED_MEDIA_TYPE
 
-    # Check for XML content type and XML support
-    if req_content_type == MIME_APPLICATION_XML:
-        if not xml_capable:
-            return "XML encoding not supported", HTTPStatus.UNSUPPORTED_MEDIA_TYPE
-
-    # Check for JSON content type and JSON support
-    elif req_content_type == MIME_APPLICATION_JSON:
-        if not json_capable:
-            return "JSON encoding not supported", HTTPStatus.UNSUPPORTED_MEDIA_TYPE
-
-    # Unsupported Content-Type
-    else:
+    if req_content_type not in [MIME_APPLICATION_JSON, MIME_APPLICATION_XML]:
         return "Unsupported Media Type", HTTPStatus.UNSUPPORTED_MEDIA_TYPE
 
-    # If the Content-Type is supported, respond with 204 No Content
-    if validate_relay_notif(request.data):
-        return '', HTTPStatus.NO_CONTENT
-    else:
-        return "relay notification doesn't correspond with the yang module", HTTPStatus.BAD_REQUEST
+    if (req_content_type == MIME_APPLICATION_JSON and not json_capable) or \
+       (req_content_type == MIME_APPLICATION_XML and not xml_capable):
+        return f"{req_content_type} encoding not supported", HTTPStatus.UNSUPPORTED_MEDIA_TYPE
+
+    is_valid, error_message = validate_relay_notif(request.data)
+
+    if not is_valid:
+        if error_message.startswith("Parsing error") or error_message == "Invalid Content-Type":
+            return error_message, HTTPStatus.UNSUPPORTED_MEDIA_TYPE
+        return error_message, HTTPStatus.BAD_REQUEST
+
+    try: 
+        data_string = request.data.decode('utf-8')
+        if req_content_type == MIME_APPLICATION_JSON:
+            message = json.loads(data_string)
+        elif req_content_type == MIME_APPLICATION_XML:
+            message = xmltodict.parse(data_string, process_namespaces=True)
+            message = strip_namespace(message)
+
+     # Produce message to Kafka 
+        producer.produce(
+            KAFKA_TOPIC_NAME,
+            key=None,
+            value=json.dumps(message),
+            callback=delivery_report
+        )
+        producer.flush()
+        app.logger.info(f"Message sent to Kafka topic '{KAFKA_TOPIC_NAME}': {message}")
+    except Exception as e:
+        app.logger.error(f"Error sending message to Kafka: {e}")
+        return "Internal Server Error", HTTPStatus.INTERNAL_SERVER_ERROR
+    
+    POST_BODY_SIZE.set(len(request.data))
+    return '', HTTPStatus.NO_CONTENT
+
+# Metrics for Prometheus
+REQUEST_COUNT = Counter('http_requests_total', 'Total HTTP Requests', ['method', 'endpoint', 'status_code', 'content_type'])
+REQUEST_LATENCY_CAPABILITIES = Gauge('http_request_latency_seconds_capabilities', 'Latency of HTTP GET /capabilities')
+REQUEST_LATENCY_NOTIFICATION_JSON = Gauge('http_request_latency_seconds_notification_json', 'Latency of HTTP POST /relay-notification (JSON)')
+REQUEST_LATENCY_NOTIFICATION_XML = Gauge('http_request_latency_seconds_notification_xml', 'Latency of HTTP POST /relay-notification (XML)')
+POST_BODY_SIZE = Gauge('post_request_body_size_bytes', 'Size of POST request body in bytes')
+
+@app.before_request
+def start_timer():
+    """Start the timer before processing the request."""
+    request.start_time = time.time()
+
+@app.after_request
+def record_metrics(response):
+    """Record metrics after processing the request."""
+    content_type = request.headers.get('Content-Type', 'unknown')
+    REQUEST_COUNT.labels(
+        method=request.method,
+        endpoint=request.path,
+        status_code=response.status_code,
+        content_type=content_type
+    ).inc()
+    latency = time.time() - request.start_time
+    if request.path == '/capabilities' and request.method == 'GET':
+        REQUEST_LATENCY_CAPABILITIES.set(latency)
+    elif request.path == '/relay-notification' and request.method == 'POST':
+        if content_type == MIME_APPLICATION_JSON:
+            REQUEST_LATENCY_NOTIFICATION_JSON.set(latency)
+        elif content_type == MIME_APPLICATION_XML:
+            REQUEST_LATENCY_NOTIFICATION_XML.set(latency)
+
+    return response
+
+@app.route('/metrics', methods=['GET'])
+def metrics():
+    return Response(generate_latest(), mimetype="text/plain")
 
 if __name__ == '__main__':
-    app.run()  
+    app.run()
