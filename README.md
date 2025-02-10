@@ -858,23 +858,204 @@ Transfer/sec:    180.34KB
 
 
 
-## Setup commands:
+## Setup
+---
+
+## **📌 Step 1: Create Network Namespaces**
+First, we create two separate network namespaces to **isolate the network stack** for different processes.
 
 ```bash
 sudo ip netns add publisher_ns
 sudo ip netns add collector_ns
+```
+- `publisher_ns` will act as the **client**.
+- `collector_ns` will run the **webserver**.
 
+📝 **Namespaces are like separate virtual machines** but are lightweight.
+
+---
+
+## **📌 Step 2: Create a Linux Bridge (`br0`)**
+A **bridge acts as a virtual Ethernet switch**, allowing the two namespaces to communicate as if they are in the same LAN.
+
+```bash
+sudo ip link add br0 type bridge
+```
+- Creates a **Layer 2 (Ethernet) bridge** named `br0`.
+- The bridge itself doesn’t hold traffic but **forwards** it between connected interfaces.
+
+---
+
+## **📌 Step 3: Assign an IP to the Bridge**
+The **bridge doesn’t need an IP**, but assigning one allows the **host** to communicate with namespaces.
+
+```bash
+sudo ip addr add 192.168.1.254/24 dev br0
+```
+- `192.168.1.254/24` is an IP in the same subnet as the namespaces.
+- The **host machine can now talk** to the namespaces.
+
+```bash
+sudo ip link set br0 up
+```
+- Activates the bridge.
+
+---
+
+## **📌 Step 4: Create Virtual Ethernet (`veth`) Pairs**
+We create two `veth` (virtual Ethernet) pairs:
+
+```bash
 sudo ip link add veth0 type veth peer name veth1
-sudo ip link set veth0 netns publisher_ns
-sudo ip link set veth1 netns collector_ns
+sudo ip link add veth2 type veth peer name veth3
+```
+- `veth0 ↔ veth1` will connect `publisher_ns` to `br0`.
+- `veth2 ↔ veth3` will connect `collector_ns` to `br0`.
 
+📝 **Think of each veth pair as a cable** that connects two network interfaces.
+
+---
+
+## **📌 Step 5: Move Interfaces to the Namespaces**
+Now, we move **one end of each veth pair** into the respective namespace.
+
+```bash
+sudo ip link set veth0 netns publisher_ns
+sudo ip link set veth2 netns collector_ns
+```
+- `veth0` goes inside `publisher_ns`.
+- `veth2` goes inside `collector_ns`.
+- `veth1` and `veth3` **stay on the host** to connect to `br0`.
+
+---
+
+## **📌 Step 6: Attach Interfaces to the Bridge**
+Now, we **attach the host-side interfaces (`veth1` and `veth3`) to `br0`**.
+
+```bash
+sudo ip link set veth1 master br0
+sudo ip link set veth3 master br0
+```
+- This makes `br0` the **switch** between the two namespaces.
+
+```bash
+sudo ip link set veth1 up
+sudo ip link set veth3 up
+```
+- Bring up both **bridge-connected interfaces**.
+
+---
+
+## **📌 Step 7: Assign IP Addresses to Namespace Interfaces**
+Now, we assign **IP addresses** to the `veth` interfaces inside namespaces.
+
+```bash
 sudo ip netns exec publisher_ns ip addr add 192.168.1.1/24 dev veth0
-sudo ip netns exec collector_ns ip addr add 192.168.1.2/24 dev veth1
+sudo ip netns exec collector_ns ip addr add 192.168.1.2/24 dev veth2
+```
+- `publisher_ns`: `192.168.1.1/24`
+- `collector_ns`: `192.168.1.2/24`
+
+---
+
+## **📌 Step 8: Bring Up Interfaces**
+Activate the interfaces inside each namespace.
+
+```bash
 sudo ip netns exec publisher_ns ip link set veth0 up
-sudo ip netns exec collector_ns ip link set veth1 up
+sudo ip netns exec collector_ns ip link set veth2 up
+```
+- Now, `veth0` and `veth2` **are active** inside their respective namespaces.
+
+Activate the **loopback interface** (important for some applications):
+
+```bash
 sudo ip netns exec publisher_ns ip link set lo up
 sudo ip netns exec collector_ns ip link set lo up
 ```
+
+---
+
+## **📌 Step 9: Test Connectivity Between Namespaces**
+At this point, **both namespaces are on the same subnet (`192.168.1.0/24`)**. Let's test:
+
+```bash
+sudo ip netns exec publisher_ns ping -c 3 192.168.1.2
+```
+✅ If successful, `publisher_ns` can reach `collector_ns` through `br0`.
+
+---
+
+## **📌 Step 10: Run a Web Server in `collector_ns`**
+We start a **Python web server** inside `collector_ns` on port `8080`:
+
+```bash
+sudo ip netns exec collector_ns python3 -m http.server 8080 --bind 192.168.1.2
+```
+- The webserver is now listening on `192.168.1.2:8080`.
+
+✅ **Test from publisher_ns**:
+
+```bash
+sudo ip netns exec publisher_ns curl http://192.168.1.2:8080
+```
+If successful, it will return an **HTML directory listing**.
+
+---
+
+## **📌 Step 11: Allow Host to Access `collector_ns` Web Server**
+By default, the host **cannot reach 192.168.1.2**. To fix this:
+
+```bash
+sudo ip route add 192.168.1.0/24 dev br0
+```
+- This tells the host **to send packets for `192.168.1.0/24` via `br0`**.
+
+✅ **Now test from the host**:
+
+```bash
+curl http://192.168.1.2:8080
+```
+🎉 The host can now access the webserver running in `collector_ns`!
+
+---
+
+## **📌 Step 12: Setup Prometheus & Grafana**
+### **1️⃣ Run Prometheus on Host**
+Edit `/etc/prometheus/prometheus.yml`:
+
+```yaml
+scrape_configs:
+  - job_name: "collector"
+    static_configs:
+      - targets: ["192.168.1.2:8080"]
+```
+
+Now start Prometheus:
+
+```bash
+prometheus --config.file=/etc/prometheus/prometheus.yml
+```
+✅ Prometheus is **scraping data** from `192.168.1.2:8080`.
+
+---
+
+### **2️⃣ Run Grafana on Host**
+Start Grafana:
+
+```bash
+grafana-server
+```
+
+- Open Grafana in a browser: `http://localhost:3000`
+- Add Prometheus as a **data source** (`http://localhost:9090`).
+- Create a **dashboard** to visualize metrics.
+
+---
+
+Below is an image describing the setup : <br>
+![setup](setup.png)
+
 
 ## script 
 
@@ -889,12 +1070,15 @@ LATENCY="50ms"       # Simulate 50ms network latency
 # IP address of the collector (server) namespace
 SERVER_IP="192.168.1.2:8080"
 
-# Header for the table
-echo -e "Bandwidth\tEncoding\tRequests/sec\tTransfer/sec\tThroughput (Mbps)"
-
 for bw in "${BANDWIDTHS[@]}"; do
+    echo "Setting bandwidth to $bw with burst $BURST and latency $LATENCY"
+
+    # Ensure the qdisc exists by adding it first
+    sudo ip netns exec publisher_ns tc qdisc add dev veth0 root tbf rate $bw burst $BURST latency $LATENCY 2>/dev/null || \
     sudo ip netns exec publisher_ns tc qdisc change dev veth0 root tbf rate $bw burst $BURST latency $LATENCY
-    sudo ip netns exec collector_ns tc qdisc change dev veth1 root tbf rate $bw burst $BURST latency $LATENCY
+
+    sudo ip netns exec collector_ns tc qdisc add dev veth2 root tbf rate $bw burst $BURST latency $LATENCY 2>/dev/null || \
+    sudo ip netns exec collector_ns tc qdisc change dev veth2 root tbf rate $bw burst $BURST latency $LATENCY
 
     for encoding in "${ENCODINGS[@]}"; do
         if [ "$encoding" == "json" ]; then
@@ -905,26 +1089,10 @@ for bw in "${BANDWIDTHS[@]}"; do
             content_type="application/xml"
         fi
 
-	# Capture TX bytes before the test
-	tx_start=$(sudo ip netns exec publisher_ns ip -s link show dev veth0 | awk '/TX:/ {getline; print $1}')
-
-	# Run go-wrk and capture the results
-	result=$(sudo ip netns exec publisher_ns go-wrk -no-vr -M POST -c 100 -d 30 -cpus 2 \
-    		-H "Content-Type: $content_type" -body @$body_file \
-    		https://${SERVER_IP}/relay-notification)
-
-	# Capture TX bytes after the test
-	tx_end=$(sudo ip netns exec publisher_ns ip -s link show dev veth0 | awk '/TX:/ {getline; print $1}')
-
-
-	# Extract values using regex or text processing
-        requests_sec=$(echo "$result" | grep -oP 'Overall Requests/sec:\s+\K[\d.]+')
-	transfer_sec=$(echo "$result" | grep -oP 'Overall Transfer/sec:\s+\K[\d.]+[A-Za-z]+')
-
-	throughput_mbps=$(echo "scale=2; (($tx_end - $tx_start) * 8) / (30 * 1024 * 1024)" | bc)
-
-        # Output the results in a tabular format
-        echo -e "$bw\t$encoding\t$requests_sec\t$transfer_sec\t$throughput_mbps"
+        echo "Testing $encoding at $bw bandwidth"
+        sudo ip netns exec publisher_ns go-wrk -no-vr -M POST -c 100 -d 30 -cpus 2 \
+            -H "Content-Type: $content_type" -body @$body_file \
+            https://${SERVER_IP}/relay-notification > results_${encoding}_${bw}.txt
     done
 done
 ```
@@ -1065,7 +1233,6 @@ This data provides insight into the system's performance limits and the comparat
 ### code
 
 ```python
-# Re-importing necessary libraries after reset
 import numpy as np
 import matplotlib.pyplot as plt
 
