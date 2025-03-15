@@ -5,12 +5,6 @@ Here we implement the https-notif collector in the following languages :
      - Flask
      - Fast API
 
-  - Extended implementation in C
-     - libmicrohttpd
-
-  - TBD in go
-    - net/http
-
 testing using work tool
 
 my cpu info :
