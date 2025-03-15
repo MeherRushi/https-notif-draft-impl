@@ -4,6 +4,7 @@
     "module": [
       {
         "name": "ietf-https-notif",
+        "feature" :["if-mib"], 
         "revision": "",
         "namespace": "urn:ietf:params:xml:ns:netconf:notification:1.0",
         "conformance-type": "implement"
