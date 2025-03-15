@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, Response
 from prometheus_client import Counter, Gauge, generate_latest 
 import json
 import xmltodict
+import cbor2
 import re
 from http import HTTPStatus
 from yangson import DataModel
@@ -11,8 +12,8 @@ from confluent_kafka import Producer
 
 
 # Kafka producer configuration
-KAFKA_TOPIC_NAME = 'test-topic'
-producer = Producer({'bootstrap.servers': 'localhost:9092'})
+# KAFKA_TOPIC_NAME = 'test-topic'
+# producer = Producer({'bootstrap.servers': 'localhost:9092'})
 
 def delivery_report(err, msg):
     if err:
@@ -24,6 +25,7 @@ def delivery_report(err, msg):
 # Define constants for the URNs, namespace, and JSON keys
 URN_ENCODING_JSON = "urn:ietf:capability:https-notif-receiver:encoding:json"
 URN_ENCODING_XML = "urn:ietf:capability:https-notif-receiver:encoding:xml"
+URN_ENCODING_CBOR = "urn:ietf:capability:https-notif-receiver:encoding:cbor"
 JSON_RECEIVER_CAPABILITIES = "receiver-capabilities"
 JSON_RECEIVER_CAPABILITY = "receiver-capability"
 UHTTPS_CONTENT_TYPE = 'Content-Type'
@@ -32,10 +34,12 @@ UHTTPS_ACCEPT = 'Accept'
 # Define constants for media types
 MIME_APPLICATION_XML = "application/xml"
 MIME_APPLICATION_JSON = "application/json"
+MIME_APPLICATION_CBOR = "application/cbor"  #Unsure about its existence.
 
 # collector capabilities
 json_capable = True
-xml_capable = True
+xml_capable = False
+cbor_capable = False
 
 # Define your YANG module path and model name
 yang_dir_path = "../../yang_modules/"
@@ -61,6 +65,9 @@ def strip_namespace(data):
 
 def validate_relay_notif(data_string):
     req_content_type = request.headers.get(UHTTPS_CONTENT_TYPE)
+    print(f"Original data string : {data_string}")
+    
+
     try:
         if req_content_type == MIME_APPLICATION_JSON:
             json_data = json.loads(data_string)
@@ -73,6 +80,15 @@ def validate_relay_notif(data_string):
                     "event": parsed_xml["notification"]["event"]
                 }
             }
+        elif req_content_type == MIME_APPLICATION_CBOR :
+            parsed_cbor = bytes.fromhex(data_string.decode('utf-8'))
+            json_data = cbor2.loads(parsed_cbor)
+            print("*"*10)
+            print(json_data)
+
+            # parsed_cbor = cbor2.loads(bytes.fromhex(str(data_string)))
+            # json_data = json.loads(parsed_cbor.decode('ascii'))
+            print(f"Parsed CBOR data : {parsed_cbor}")
         else:
             return 0, "Invalid Content-Type"
     except Exception as e:
@@ -87,12 +103,14 @@ def validate_relay_notif(data_string):
         app.logger.error(f"Validation error: {e}")
         return 0, "Validation error: data does not conform to the YANG module"
 
-def build_capabilities_data(json_capable, xml_capable):
+def build_capabilities_data(json_capable, xml_capable, cbor_capable):
     capabilities_data = []
     if json_capable:
         capabilities_data.append(URN_ENCODING_JSON)
     if xml_capable:
         capabilities_data.append(URN_ENCODING_XML)
+    if cbor_capable:
+        capabilities_data.append(URN_ENCODING_CBOR)
     return capabilities_data
 
 def build_xml(capabilities_data):
@@ -111,6 +129,16 @@ def build_json(capabilities_data):
         }
     }, indent=2)
 
+def build_cbor(capabilities_data):
+    """Builds a CBOR structure from capabilities data."""
+    data =  cbor2.dumps({
+        JSON_RECEIVER_CAPABILITIES: {
+            JSON_RECEIVER_CAPABILITY: capabilities_data
+        }
+    }).hex()
+    print(data)
+    return data
+
 def get_q_value(accept_header, media_type):
     """Extracts the q value for a specific media type from the Accept header."""
     pattern = re.compile(rf"{media_type}(;q=([0-9.]+))?")
@@ -120,43 +148,53 @@ def get_q_value(accept_header, media_type):
         return float(q_value) if q_value else 1.0
     return 0.0
 
-def get_default_response(json_capable, xml_capable, capabilities_data):
+def get_default_response(json_capable, xml_capable, cbor_capable, capabilities_data):
     """Returns the default response based on capabilities."""
     if xml_capable:
         return build_xml(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_XML}
     elif json_capable:
         return build_json(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_JSON}
+    elif cbor_capable:
+        return build_cbor(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_CBOR}
     return jsonify({"error": "No valid capabilities found"}), HTTPStatus.INTERNAL_SERVER_ERROR
 
-def respond_with_content_type(accept_header, json_capable, xml_capable, capabilities_data):
+def respond_with_content_type(accept_header, json_capable, xml_capable, cbor_capable, capabilities_data):
     """Responds based on the Accept header and content capabilities, considering q-values."""
     q_xml = get_q_value(accept_header, MIME_APPLICATION_XML)
     q_json = get_q_value(accept_header, MIME_APPLICATION_JSON)
+    q_cbor = get_q_value(accept_header, MIME_APPLICATION_CBOR)
 
-    if q_xml < 0 or q_json < 0 or q_xml > 1 or q_json > 1:
+    if q_xml < 0 or q_json < 0 or q_cbor < 0 or q_xml > 1 or q_json > 1 or q_cbor > 1:
         return jsonify({"error": "Invalid q value"}), HTTPStatus.BAD_REQUEST
 
-    if q_json == 0 and q_xml == 0:
-        return get_default_response(json_capable, xml_capable, capabilities_data)
+    if q_json == 0 and q_xml == 0 and q_cbor == 0:
+        return get_default_response(json_capable, xml_capable, cbor_capable, capabilities_data)
 
     if xml_capable and (q_xml >= q_json or not json_capable):
         return build_xml(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_XML}
 
     if json_capable and q_json > 0:
         return build_json(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_JSON}
+    
+    #! Handle CBOR edge cases
+
+    if cbor_capable and q_cbor > 0:
+        return build_cbor(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_CBOR}
 
     return jsonify({"error": "Not acceptable"}), HTTPStatus.NOT_ACCEPTABLE
 
 @app.route('/capabilities', methods=['GET'])
 def get_capabilities():
     """Handles the /capabilities GET request."""
-    capabilities_data = build_capabilities_data(json_capable, xml_capable)
+    capabilities_data = build_capabilities_data(json_capable, xml_capable, cbor_capable)
+    print(capabilities_data)
 
     accept_header = request.headers.get(UHTTPS_ACCEPT)
+    print(accept_header)
     if accept_header:
-        return respond_with_content_type(accept_header, json_capable, xml_capable, capabilities_data)
+        return respond_with_content_type(accept_header, json_capable, xml_capable, cbor_capable, capabilities_data)
 
-    return get_default_response(json_capable, xml_capable, capabilities_data)
+    return get_default_response(json_capable, xml_capable, cbor_capable, capabilities_data)
 
 @app.route('/relay-notification', methods=['POST'])
 def post_notification():
@@ -165,13 +203,15 @@ def post_notification():
     if req_content_type is None:
         return "Content-type is None -> Empty Body Notification", HTTPStatus.UNSUPPORTED_MEDIA_TYPE
 
-    if req_content_type not in [MIME_APPLICATION_JSON, MIME_APPLICATION_XML]:
+    if req_content_type not in [MIME_APPLICATION_JSON, MIME_APPLICATION_XML, MIME_APPLICATION_CBOR]:
         return "Unsupported Media Type", HTTPStatus.UNSUPPORTED_MEDIA_TYPE
 
     if (req_content_type == MIME_APPLICATION_JSON and not json_capable) or \
-       (req_content_type == MIME_APPLICATION_XML and not xml_capable):
+       (req_content_type == MIME_APPLICATION_XML and not xml_capable) or \
+        (req_content_type == MIME_APPLICATION_CBOR and not cbor_capable):
         return f"{req_content_type} encoding not supported", HTTPStatus.UNSUPPORTED_MEDIA_TYPE
 
+    print(f"Request data is {request.data}")
     is_valid, error_message = validate_relay_notif(request.data)
 
     if not is_valid:
@@ -187,15 +227,15 @@ def post_notification():
             message = xmltodict.parse(data_string, process_namespaces=True)
             message = strip_namespace(message)
 
-     # Produce message to Kafka 
-        producer.produce(
-            KAFKA_TOPIC_NAME,
-            key=None,
-            value=json.dumps(message),
-            callback=delivery_report
-        )
-        producer.flush()
-        app.logger.info(f"Message sent to Kafka topic '{KAFKA_TOPIC_NAME}': {message}")
+    #  # Produce message to Kafka 
+    #     producer.produce(
+    #         KAFKA_TOPIC_NAME,
+    #         key=None,
+    #         value=json.dumps(message),
+    #         callback=delivery_report
+    #     )
+    #     producer.flush()
+    #     app.logger.info(f"Message sent to Kafka topic '{KAFKA_TOPIC_NAME}': {message}")
     except Exception as e:
         app.logger.error(f"Error sending message to Kafka: {e}")
         return "Internal Server Error", HTTPStatus.INTERNAL_SERVER_ERROR
