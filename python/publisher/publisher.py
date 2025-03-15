@@ -109,7 +109,7 @@ def valid_ipv4_ipv6(addr):
     
     return True
 
-def cbor_capabilities_check(capabilities,   args):
+def cbor_capabilities_check(capabilities, args):
     try:
         publisher_print(f"Unparsed capabilitties : {capabilities.text.encode()}",args)
         parsed = cbor2.loads(bytes.fromhex(capabilities.text))
@@ -189,9 +189,9 @@ def main():
 
         if 'json' in capabilities_response.text:
             publisher_print("Receiver supports JSON encoding!",args.verbose)
-        if 'xml' in capabilities_response.text:
+        elif 'xml' in capabilities_response.text:
             publisher_print("Receiver supports XML encoding!",args.verbose)
-        if cbor_capabilities_check(capabilities, args):
+        elif cbor_capabilities_check(capabilities, args):
             publisher_print("Receiver supports CBOR encoding!",args.verbose)
         if 'json' not in capabilities_response.text and 'xml' not in capabilities_response.text and not cbor_capabilities_check(capabilities,args):
             publisher_print("Receiver does not support any valid encoding type!",args.verbose)

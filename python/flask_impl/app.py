@@ -37,9 +37,9 @@ MIME_APPLICATION_JSON = "application/json"
 MIME_APPLICATION_CBOR = "application/cbor"  #Unsure about its existence.
 
 # collector capabilities
-json_capable = False
+json_capable = True
 xml_capable = False
-cbor_capable = True
+cbor_capable = False
 
 # Define your YANG module path and model name
 yang_dir_path = "../../yang_modules/"
