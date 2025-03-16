@@ -98,7 +98,6 @@ def validate_relay_notif(data_string):
     try:
         instance = data_model.from_raw(json_data)
         instance.validate(ctype=ContentType.all)
-        return 1, None
     except Exception as e:
         app.logger.error(f"Validation error: {e}")
         return 0, "Validation error: data does not conform to the YANG module"
