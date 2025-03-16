@@ -1,10 +1,34 @@
-<notification xmlns="urn:ietf:params:xml:ns:netconf:notification:1.0">
-  <eventTime>2013-12-21T00:01:00Z</eventTime>
-  <event>
-    <event-class>fault</event-class>
-    <reporting-entity>
-      <card>Ethernet0</card>
-    </reporting-entity>
-    <severity>major</severity>
-  </event>
-</notification>
+<ietf-https-notif:notification>
+    <eventTime>2025-03-15T01:48:33.814527Z</eventTime>
+    <interface_data>
+        <interface>
+            <name>lo</name>
+            <description>loopback</description>
+            <type>iana-if-type:softwareLoopback</type>
+            <enabled>false</enabled>
+            <admin-status>up</admin-status>
+            <oper-status>up</oper-status>
+            <last-change>2025-03-15T01:48:33.814527Z</last-change>
+            <if-index>1</if-index>
+            <phys-address>00:00:00:00:00:00</phys-address>
+            <higher-layer-if></higher-layer-if>
+            <lower-layer-if></lower-layer-if>
+            <speed>0</speed>
+            <statistics>
+                <discontinuity-time>2025-03-15T01:48:33.814527Z</discontinuity-time>
+                <in-octets>0</in-octets>
+                <in-unicast-pkts>12</in-unicast-pkts>
+                <in-broadcast-pkts>13</in-broadcast-pkts>
+                <in-multicast-pkts>14</in-multicast-pkts>
+                <in-discards>32</in-discards>
+                <in-errors>2</in-errors>
+                <in-unknown-protos>32</in-unknown-protos>
+                <out-octets>32876</out-octets>
+                <out-broadcast-pkts>3224</out-broadcast-pkts>
+                <out-multicast-pkts>3298329</out-multicast-pkts>
+                <out-discards>3232</out-discards>
+                <out-errors>3242</out-errors>
+            </statistics>
+        </interface>
+    </interface_data>
+</ietf-https-notif:notification>

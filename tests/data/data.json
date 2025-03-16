@@ -1,10 +1,39 @@
 {
     "ietf-https-notif:notification": {
-    "eventTime": "2013-12-21T00:01:00Z",
-    "event" : {
-        "event-class" : "fault",
-        "reporting-entity" : { "card" : "Ethernet0" },
-        "severity" : "major"
+        "eventTime": "2025-03-15T01:48:33.814527Z",
+        "interface_data": {
+          "interface": [
+            {
+              "name": "lo",
+              "description": "loopback",
+              "type": "iana-if-type:softwareLoopback", 
+              "enabled" : false, 
+              "admin-status" : "up", 
+              "oper-status" : "up", 
+              "last-change" : "2025-03-15T01:48:33.814527Z", 
+              "if-index" : 1, 
+              "phys-address" : "00:00:00:00:00:00", 
+              "higher-layer-if" : [], 
+              "lower-layer-if" :[], 
+              "speed" : "0", 
+              "statistics" : {
+                "discontinuity-time" : "2025-03-15T01:48:33.814527Z", 
+                "in-octets" : "0", 
+                "in-unicast-pkts" : "12", 
+                "in-broadcast-pkts" : "13", 
+                "in-multicast-pkts" :"14", 
+                "in-discards" : 32, 
+                "in-errors" : 2, 
+                "in-unknown-protos" : 32, 
+                "out-octets" :  "32876", 
+                "out-broadcast-pkts" : "3224", 
+                "out-multicast-pkts" : "3298329", 
+                "out-discards" : 3232, 
+                "out-errors" : 3242
+              }
+            }
+            ]
+          }
+      }
     }
-    }
-}
+    
