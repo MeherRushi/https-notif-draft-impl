@@ -12,8 +12,8 @@ from confluent_kafka import Producer
 
 
 # Kafka producer configuration
-# KAFKA_TOPIC_NAME = 'test-topic'
-# producer = Producer({'bootstrap.servers': 'localhost:9092'})
+KAFKA_TOPIC_NAME = 'test-topic'
+producer = Producer({'bootstrap.servers': 'localhost:9092'})
 
 def delivery_report(err, msg):
     if err:
@@ -83,12 +83,9 @@ def validate_relay_notif(data_string):
         elif req_content_type == MIME_APPLICATION_CBOR :
             parsed_cbor = bytes.fromhex(data_string.decode('utf-8'))
             json_data = cbor2.loads(parsed_cbor)
-            print("*"*10)
-            print(json_data)
-
-            # parsed_cbor = cbor2.loads(bytes.fromhex(str(data_string)))
-            # json_data = json.loads(parsed_cbor.decode('ascii'))
-            print(f"Parsed CBOR data : {parsed_cbor}")
+            # print("*"*10)
+            # print(json_data)
+            # print(f"Parsed CBOR data : {parsed_cbor}")
         else:
             return 0, "Invalid Content-Type"
     except Exception as e:
@@ -169,15 +166,16 @@ def respond_with_content_type(accept_header, json_capable, xml_capable, cbor_cap
     if q_json == 0 and q_xml == 0 and q_cbor == 0:
         return get_default_response(json_capable, xml_capable, cbor_capable, capabilities_data)
 
-    if xml_capable and (q_xml >= q_json or not json_capable):
+    # if xml_capable and (q_xml >= q_json or not json_capable):
+    if(xml_capable and (q_xml >= q_json and q_xml >= q_cbor)):
         return build_xml(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_XML}
-
-    if json_capable and q_json > 0:
-        return build_json(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_JSON}
     
-    #! Handle CBOR edge cases
-
-    if cbor_capable and q_cbor > 0:
+    q_max = max(q_xml,q_json,q_cbor)
+    if q_max == q_xml and xml_capable:
+        return build_xml(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_XML}
+    elif q_max == q_json and json_capable:
+        return build_json(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_JSON}
+    elif q_max == q_cbor and cbor_capable:
         return build_cbor(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_CBOR}
 
     return jsonify({"error": "Not acceptable"}), HTTPStatus.NOT_ACCEPTABLE
@@ -226,15 +224,15 @@ def post_notification():
             message = xmltodict.parse(data_string, process_namespaces=True)
             message = strip_namespace(message)
 
-    #  # Produce message to Kafka 
-    #     producer.produce(
-    #         KAFKA_TOPIC_NAME,
-    #         key=None,
-    #         value=json.dumps(message),
-    #         callback=delivery_report
-    #     )
-    #     producer.flush()
-    #     app.logger.info(f"Message sent to Kafka topic '{KAFKA_TOPIC_NAME}': {message}")
+     # Produce message to Kafka 
+        producer.produce(
+            KAFKA_TOPIC_NAME,
+            key=None,
+            value=json.dumps(message),
+            callback=delivery_report
+        )
+        producer.flush()
+        app.logger.info(f"Message sent to Kafka topic '{KAFKA_TOPIC_NAME}': {message}")
     except Exception as e:
         app.logger.error(f"Error sending message to Kafka: {e}")
         return "Internal Server Error", HTTPStatus.INTERNAL_SERVER_ERROR
