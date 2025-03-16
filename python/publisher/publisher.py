@@ -24,7 +24,7 @@ def fetch_data_new():
 def read_file(path):
     try :
         with open(path, 'r') as f:
-            return f.read()
+            return f.read().strip()
     except:
         return ""               #Exceptions raised due to files being in an unreadable state is because the interface itself is
                                 #not up or not configured. Hence an empty string is returned. This is not an error condition. 
@@ -39,7 +39,7 @@ def get_interface_info(iface):
     if_data_operstate = None
     for link in links:
         if link.get_attr("IFLA_IFNAME") == iface:
-            if_data_operstate = link.get_attr("IFLA_OPERSTATE")
+            if_data_operstate = str(link.get_attr("IFLA_OPERSTATE"))
             break
 
     try :
@@ -55,7 +55,7 @@ def get_interface_info(iface):
             "phys-address": read_file(iface_path + "address"),
             "higher-layer-if": [],                                                  # check ifStackTable, not directly available. This leaf is optional
             "lower-layer-if": [],                                                   # check ifStackTable, not directly available. This leaf is optional
-            "speed": read_file(iface_path + "speed"),                               #value in Mbits/sec
+            "speed": str(read_file(iface_path + "speed")) if read_file(iface_path + "speed") != "" else "0",  
             "statistics": {
                 "discontinuity-time":   "",                                         # TODO
                 "in-octets": read_file(stats_path + "rx_bytes"),                    #Indicates the number of bytes received by this network device
