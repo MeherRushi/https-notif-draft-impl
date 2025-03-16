@@ -12,11 +12,11 @@ from pyroute2 import IPRoute
 
 def fetch_data_new():
     interfaces = os.listdir("/sys/class/net/")
-    interfaces_info = {}
+    interfaces_info = []
     
     for iface in interfaces:
         try:
-            interfaces_info[iface] = get_interface_info(iface)
+            interfaces_info.append(get_interface_info(iface))
         except:
             raise AssertionError(f"Error while reading interface information for interface : {iface}")
     return interfaces_info
@@ -27,50 +27,62 @@ def read_file(path):
             return f.read().strip()
     except:
         return ""               #Exceptions raised due to files being in an unreadable state is because the interface itself is
-                                #not up or not configured. Hence an empty string is returned. This is not an error condition. 
+    finally:                    #not up or not configured. Hence an empty string is returned. This is not an error condition.
+        f.close()                             
 
 def get_interface_info(iface):
     iface_path = f"/sys/class/net/{iface}/"
     stats_path = f"{iface_path}statistics/"
 
+    #####
     ipr = IPRoute()
     links = ipr.link("dump")
     if_data_name = links[0].get_attr("IFLA_IFNAME")
     if_data_operstate = None
     for link in links:
         if link.get_attr("IFLA_IFNAME") == iface:
-            if_data_operstate = str(link.get_attr("IFLA_OPERSTATE"))
+            if_data_operstate = str(link.get_attr("IFLA_OPERSTATE")).lower()
+            print(f"inside loop {if_data_operstate}")
+            if_data_operstate = "testing" if (if_data_operstate == "unknown") else if_data_operstate
             break
+
+    #####
+    speed_val = None
+    speed_file_value = read_file(iface_path + "speed")
+    if(speed_file_value == ""):
+        speed_val = "0"
+    elif(int(speed_file_value) < 0):
+        speed_val = "0"
 
     try :
         interface = {
             "name": iface,
             "description": "",                                                      #? Unsure where to find this information
             "type": read_file(iface_path + "type"),
-            "enabled": read_file(iface_path + "carrier") == "1",                    # Indicates the current physical link state of the interface
-            "admin-status" : read_file(iface_path + "operstate"),                   #! operstate is infact admin-status
-            "oper-status": if_data_operstate,                                  
-            "last-change": "",                                                      #Not directly available on *nix systems. This leaf is optional
-            "if-index": read_file(iface_path + "ifindex"),
+            "enabled": read_file(iface_path + "carrier") == "1",                    
+            "admin-status" : if_data_operstate,
+            "oper-status" : read_file(iface_path + "operstate"),                                
+            # "last-change": "",                                                      #Not directly available on *nix systems. This leaf is optional
+            "if-index": int(read_file(iface_path + "ifindex")),
             "phys-address": read_file(iface_path + "address"),
             "higher-layer-if": [],                                                  # check ifStackTable, not directly available. This leaf is optional
             "lower-layer-if": [],                                                   # check ifStackTable, not directly available. This leaf is optional
-            "speed": str(read_file(iface_path + "speed")) if read_file(iface_path + "speed") != "" else "0",  
+            "speed" : speed_val, 
             "statistics": {
-                "discontinuity-time":   "",                                         # TODO
+                "discontinuity-time":   datetime.datetime.now().isoformat() + 'Z',                                         # TODO
                 "in-octets": read_file(stats_path + "rx_bytes"),                    #Indicates the number of bytes received by this network device
                 "in-unicast-pkts": read_file(stats_path + "rx_packets"),            #Indicates the total number of good packets received
                 # "in-broadcast-pkts": None,                                        #Not directly available on *nix systems. This leaf is optional
                 "in-multicast-pkts": read_file(stats_path + "multicast"),           
-                "in-discards": read_file(stats_path + "rx_dropped"),
-                "in-errors": read_file(stats_path + "rx_errors"),
+                "in-discards": int(read_file(stats_path + "rx_dropped")),
+                "in-errors": int(read_file(stats_path + "rx_errors")),
                 # "in-unknown-protos": None,                                        #not directly available, what is this??
                 "out-octets": read_file(stats_path + "tx_bytes"),
                 "out-unicast-pkts": read_file(stats_path + "tx_packets"),
                 # "out-broadcast-pkts": read_file(stats_path + "tx_broadcast"),     #Not directly available on *nix systems. This leaf is optional
                 # "out-multicast-pkts": read_file(stats_path + "tx_multicast"),     #Not directly available on *nix systems. This leaf is optional
-                "out-discards": read_file(stats_path + "tx_dropped"),
-                "out-errors": read_file(stats_path + "tx_errors"),
+                "out-discards": int(read_file(stats_path + "tx_dropped")),
+                "out-errors": int(read_file(stats_path + "tx_errors")),
             }
         }
     except:
@@ -111,10 +123,9 @@ def valid_ipv4_ipv6(addr):
 
 def cbor_capabilities_check(capabilities, args):
     try:
-        publisher_print(f"Unparsed capabilitties : {capabilities.text.encode()}",args)
+        publisher_print(f"Unparsed capabilities response : {capabilities.text.encode()}",args)
         parsed = cbor2.loads(bytes.fromhex(capabilities.text))
-        publisher_print(f"CBOR capabilities format parsed: {parsed}",args.verbose)
-        publisher_print(type(parsed),args.verbose)
+        publisher_print(f"CBOR capabilities fresponse, parsed: {parsed}",args.verbose)
 
         if any('cbor' in str(value) for value in parsed.values()):
             return True
@@ -187,13 +198,14 @@ def main():
         publisher_print(capabilities_response.text,args.verbose)
         print("_"*20)
 
+        cbor_capabilities_exist = cbor_capabilities_check(capabilities, args)
         if 'json' in capabilities_response.text:
             publisher_print("Receiver supports JSON encoding!",args.verbose)
         elif 'xml' in capabilities_response.text:
             publisher_print("Receiver supports XML encoding!",args.verbose)
-        elif cbor_capabilities_check(capabilities, args):
+        elif cbor_capabilities_exist:
             publisher_print("Receiver supports CBOR encoding!",args.verbose)
-        if 'json' not in capabilities_response.text and 'xml' not in capabilities_response.text and not cbor_capabilities_check(capabilities,args):
+        if 'json' not in capabilities_response.text and 'xml' not in capabilities_response.text and not cbor_capabilities_exist:
             publisher_print("Receiver does not support any valid encoding type!",args.verbose)
             raise AssertionError("Receiver does not support any valid encoding type!")
             
@@ -203,17 +215,16 @@ def main():
         while(True and retries >= 0):
             time.sleep(time_interval)
 
-            interface_data_yang8343 = {
-                    "interfaces": fetch_data_new()
-                }   
-
+            interface_data_yang8343 = fetch_data_new()
             payload = {
-                "notification": {
+                "ietf-https-notif:notification": {
                     "eventTime": datetime.datetime.now().isoformat() + 'Z',
-                    "interface_data": interface_data_yang8343
+                    "interface_data" : {
+                        "interface" : interface_data_yang8343
+                    }
                 }
             }
-            # headers = {'Content-Type': f'{content_type}'}  
+            print(payload)
             
             headers = None
             if 'json' in capabilities.text:
@@ -222,7 +233,7 @@ def main():
             elif 'xml' in capabilities.text:
                 payload = dicttoxml.dicttoxml(payload)
                 headers = {'Content-Type': 'application/xml'}
-            elif cbor_capabilities_check(capabilities,args):
+            elif cbor_capabilities_exist:
                 payload = cbor2.dumps(payload).hex()
                 headers = {'Content-Type': 'application/cbor'}
 
@@ -238,7 +249,7 @@ def main():
                 retries -= 1
 
             #test scenario - where notifications are being sent, and suddenly kill the collector, the behaviour should be that it should continue to 
-            # try to send notifications? HTTPS is a stateless protocol right? So should it continue to send notifications upto the retry limit? 
+            # try to send notifications? HTTPS is a stateless protocol. So should it continue to send notifications upto the retry limit? 
             
     except requests.exceptions.RequestException as e:
         print(f"Failed to discover capabilities OR Send notification(s): {e}")

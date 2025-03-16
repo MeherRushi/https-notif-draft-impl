@@ -12,8 +12,8 @@ from confluent_kafka import Producer
 
 
 # Kafka producer configuration
-KAFKA_TOPIC_NAME = 'test-topic'
-producer = Producer({'bootstrap.servers': 'localhost:9092'})
+# KAFKA_TOPIC_NAME = 'test-topic'
+# producer = Producer({'bootstrap.servers': 'localhost:9092'})
 
 def delivery_report(err, msg):
     if err:
@@ -37,9 +37,9 @@ MIME_APPLICATION_JSON = "application/json"
 MIME_APPLICATION_CBOR = "application/cbor"  #Unsure about its existence.
 
 # collector capabilities
-json_capable = True
+json_capable = False
 xml_capable = False
-cbor_capable = False
+cbor_capable = True
 
 # Define your YANG module path and model name
 yang_dir_path = "../../yang_modules/"
@@ -65,7 +65,7 @@ def strip_namespace(data):
 
 def validate_relay_notif(data_string):
     req_content_type = request.headers.get(UHTTPS_CONTENT_TYPE)
-    print(f"Original data string : {data_string}")
+    # print(f"Original data string : {data_string}")
     
 
     try:
@@ -95,6 +95,7 @@ def validate_relay_notif(data_string):
     try:
         instance = data_model.from_raw(json_data)
         instance.validate(ctype=ContentType.all)
+        return 1,None
     except Exception as e:
         app.logger.error(f"Validation error: {e}")
         return 0, "Validation error: data does not conform to the YANG module"
@@ -195,6 +196,7 @@ def get_capabilities():
 
 @app.route('/relay-notification', methods=['POST'])
 def post_notification():
+    print(f"Received notification at {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())}.{int(time.time() * 1000) % 1000:03d}")
     req_content_type = request.headers.get(UHTTPS_CONTENT_TYPE)
 
     if req_content_type is None:
@@ -208,7 +210,7 @@ def post_notification():
         (req_content_type == MIME_APPLICATION_CBOR and not cbor_capable):
         return f"{req_content_type} encoding not supported", HTTPStatus.UNSUPPORTED_MEDIA_TYPE
 
-    print(f"Request data is {request.data}")
+    # print(f"Request data is {request.data}")
     is_valid, error_message = validate_relay_notif(request.data)
 
     if not is_valid:
@@ -225,14 +227,14 @@ def post_notification():
             message = strip_namespace(message)
 
      # Produce message to Kafka 
-        producer.produce(
-            KAFKA_TOPIC_NAME,
-            key=None,
-            value=json.dumps(message),
-            callback=delivery_report
-        )
-        producer.flush()
-        app.logger.info(f"Message sent to Kafka topic '{KAFKA_TOPIC_NAME}': {message}")
+        # producer.produce(
+        #     KAFKA_TOPIC_NAME,
+        #     key=None,
+        #     value=json.dumps(message),
+        #     callback=delivery_report
+        # )
+        # producer.flush()
+        # app.logger.info(f"Message sent to Kafka topic '{KAFKA_TOPIC_NAME}': {message}")
     except Exception as e:
         app.logger.error(f"Error sending message to Kafka: {e}")
         return "Internal Server Error", HTTPStatus.INTERNAL_SERVER_ERROR
