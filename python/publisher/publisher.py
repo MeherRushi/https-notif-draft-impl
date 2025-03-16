@@ -1,14 +1,13 @@
 import re
 import argparse
 import time
-import random
-import sys
 import socket
 import os
 import requests
 import datetime
 import json
 import dicttoxml
+import cbor2
 from pyroute2 import IPRoute
 
 def fetch_data_new():
@@ -25,7 +24,7 @@ def fetch_data_new():
 def read_file(path):
     try :
         with open(path, 'r') as f:
-            return f.read()
+            return f.read().strip()
     except:
         return ""               #Exceptions raised due to files being in an unreadable state is because the interface itself is
                                 #not up or not configured. Hence an empty string is returned. This is not an error condition. 
@@ -40,7 +39,7 @@ def get_interface_info(iface):
     if_data_operstate = None
     for link in links:
         if link.get_attr("IFLA_IFNAME") == iface:
-            if_data_operstate = link.get_attr("IFLA_OPERSTATE")
+            if_data_operstate = str(link.get_attr("IFLA_OPERSTATE"))
             break
 
     try :
@@ -56,7 +55,7 @@ def get_interface_info(iface):
             "phys-address": read_file(iface_path + "address"),
             "higher-layer-if": [],                                                  # check ifStackTable, not directly available. This leaf is optional
             "lower-layer-if": [],                                                   # check ifStackTable, not directly available. This leaf is optional
-            "speed": read_file(iface_path + "speed"),                               #value in Mbits/sec
+            "speed": str(read_file(iface_path + "speed")) if read_file(iface_path + "speed") != "" else "0",  
             "statistics": {
                 "discontinuity-time":   "",                                         # TODO
                 "in-octets": read_file(stats_path + "rx_bytes"),                    #Indicates the number of bytes received by this network device
@@ -78,8 +77,6 @@ def get_interface_info(iface):
         raise AssertionError(f"Error while reading interface information for interface : {iface}")
     
     return interface
-    
-
 
 def fetch_data():
     interface_data_rx = {}
@@ -112,9 +109,23 @@ def valid_ipv4_ipv6(addr):
     
     return True
 
+def cbor_capabilities_check(capabilities, args):
+    try:
+        publisher_print(f"Unparsed capabilitties : {capabilities.text.encode()}",args)
+        parsed = cbor2.loads(bytes.fromhex(capabilities.text))
+        publisher_print(f"CBOR capabilities format parsed: {parsed}",args.verbose)
+        publisher_print(type(parsed),args.verbose)
+
+        if any('cbor' in str(value) for value in parsed.values()):
+            return True
+        else:
+            return False
+    except:
+        raise AssertionError("Failed to parse capabilities recieved from collector in CBOR format.")
+
 def get_capabilities(url):
     try:
-        response = requests.get(url, verify=False, headers={'Accept': 'application/json, application/xml'})
+        response = requests.get(url, verify=False, headers={'Accept': 'application/json, application/xml, application/cbor'})
         response.raise_for_status()
         return response
     except requests.exceptions.RequestException as e:
@@ -147,19 +158,15 @@ def main():
         parser.add_argument("-p","--port",type=int,help="Port number to send YANG notification.")
         parser.add_argument("-v","--verbose",action="store_true",help="Verbose mode for extra information.")
         parser.add_argument("--num-retries", type=int, help="Number of retries in case of failure while sending a notification. The publisher will retry to obtain capabilities and continue sending notifications")
-        # parser.parse_args()
+
         args = parser.parse_args()
-        # print(args.ip)
 
         time_interval = args.time if args.time else 2
         
-        print(args.verbose)
-
-        publisher_print(args.ip, args.verbose)
         if( not valid_ipv4_ipv6(args.ip)):
             print("Invalid IP Address")
-            raise KeyboardInterrupt
-        
+            raise AssertionError("Invalid IPV4/IPV6 address")
+
         
         if(args.port):
             capabilities_url = f"https://{args.ip}:{args.port}/capabilities"
@@ -168,29 +175,32 @@ def main():
             capabilities_url = f"https://{args.ip}/capabilities"
             notification_url = f"https://{args.ip}/relay-notification"
 
+        # Send GET request to /capabilities resource
         capabilities_response = get_capabilities(capabilities_url)
         capabilities = capabilities_response
         print(capabilities_response.status_code)
 
         content_type = capabilities_response.headers.get('Content-Type')
+        print("_"*20)
         print(f"Capabilities discovered through content-type header: {content_type}")
-        publisher_print("Body of capabilities response:")
-        publisher_print(capabilities_response.text)
-        print("_____________________________________________________________________")
+        publisher_print("Body of capabilities response:",args.verbose)
+        publisher_print(capabilities_response.text,args.verbose)
+        print("_"*20)
 
         if 'json' in capabilities_response.text:
-            publisher_print("Receiver supports JSON encoding!")
-        if 'xml' in capabilities_response.text:
-            publisher_print("Receiver supports XML encoding!")
-        if 'json' not in capabilities_response.text and 'xml' not in capabilities_response.text:
-            publisher_print("Receiver does not support any valid encoding type!")
+            publisher_print("Receiver supports JSON encoding!",args.verbose)
+        elif 'xml' in capabilities_response.text:
+            publisher_print("Receiver supports XML encoding!",args.verbose)
+        elif cbor_capabilities_check(capabilities, args):
+            publisher_print("Receiver supports CBOR encoding!",args.verbose)
+        if 'json' not in capabilities_response.text and 'xml' not in capabilities_response.text and not cbor_capabilities_check(capabilities,args):
+            publisher_print("Receiver does not support any valid encoding type!",args.verbose)
             raise AssertionError("Receiver does not support any valid encoding type!")
             
 
         retries = args.num_retries if args.num_retries else 3
-        while(True and retries >= 0):
-            #Removed checks for -r and -t as they are now handled by argparse.ArgumentParser.handle_mutually_exclusive_group()
 
+        while(True and retries >= 0):
             time.sleep(time_interval)
 
             interface_data_yang8343 = {
@@ -203,19 +213,24 @@ def main():
                     "interface_data": interface_data_yang8343
                 }
             }
-            headers = {'Content-Type': f'{content_type}'}  
+            # headers = {'Content-Type': f'{content_type}'}  
             
+            headers = None
             if 'json' in capabilities.text:
                 payload = json.dumps(payload)
+                headers = {'Content-Type': 'application/json'}
             elif 'xml' in capabilities.text:
                 payload = dicttoxml.dicttoxml(payload)
+                headers = {'Content-Type': 'application/xml'}
+            elif cbor_capabilities_check(capabilities,args):
+                payload = cbor2.dumps(payload).hex()
+                headers = {'Content-Type': 'application/cbor'}
 
             notification_response = send_notification(notification_url, payload, headers)
-            print("____________________________________________________")
+            print("_"*20)
             print("Notification sent, its status code is")
             print(notification_response.status_code)
 
-            #if the response is 204 no content, then print a message saying notification was sent successfully
             if notification_response.status_code == 204:
                 print("Notification sent successfully!")
             else:
