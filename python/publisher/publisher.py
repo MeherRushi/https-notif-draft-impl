@@ -9,6 +9,8 @@ import json
 import dicttoxml
 import cbor2
 from pyroute2 import IPRoute
+import sys
+import xmltodict
 
 def fetch_data_new():
     interfaces = os.listdir("/sys/class/net/")
@@ -42,22 +44,20 @@ def get_interface_info(iface):
     for link in links:
         if link.get_attr("IFLA_IFNAME") == iface:
             if_data_operstate = str(link.get_attr("IFLA_OPERSTATE")).lower()
-            print(f"inside loop {if_data_operstate}")
+            # print(f"inside loop {if_data_operstate}")
             if_data_operstate = "testing" if (if_data_operstate == "unknown") else if_data_operstate
             break
 
     #####
-    speed_val = None
+    speed_val = "0"
     speed_file_value = read_file(iface_path + "speed")
-    if(speed_file_value == ""):
-        speed_val = "0"
-    elif(int(speed_file_value) < 0):
+    if(speed_file_value.strip() == "" or int(speed_file_value) < 0):
         speed_val = "0"
 
     try :
         interface = {
             "name": iface,
-            "description": "",                                                      #? Unsure where to find this information
+            # "description": "",                                                      #? Unsure where to find this information
             "type": read_file(iface_path + "type"),
             "enabled": read_file(iface_path + "carrier") == "1",                    
             "admin-status" : if_data_operstate,
@@ -223,17 +223,21 @@ def main():
                     }
                 }
             }
-            print(payload)
+            # print(payload)
             
             headers = None
             if 'json' in capabilities.text:
                 payload = json.dumps(payload)
                 headers = {'Content-Type': 'application/json'}
             elif 'xml' in capabilities.text:
-                payload = dicttoxml.dicttoxml(payload)
+                payload= xmltodict.unparse(payload, full_document=False)
+                print(payload)
+                # payload = dicttoxml.dicttoxml(payload, root=False, attr_type=False,item_func=lambda x: 'interface')
+                with open("data.xml", "w") as f:
+                    f.write(payload)
                 headers = {'Content-Type': 'application/xml'}
             elif cbor_capabilities_check(capabilities, args):
-                payload = cbor2.dumps(payload).hex()
+                payload_cbor = cbor2.dumps(payload)
                 headers = {'Content-Type': 'application/cbor'}
             else :
                 raise AssertionError("Receiver does not support any valid encoding type!")

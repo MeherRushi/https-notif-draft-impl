@@ -12,8 +12,8 @@ from confluent_kafka import Producer
 
 
 # Kafka producer configuration
-KAFKA_TOPIC_NAME = 'test-topic'
-producer = Producer({'bootstrap.servers': 'localhost:9092'})
+# KAFKA_TOPIC_NAME = 'test-topic'
+# producer = Producer({'bootstrap.servers': 'localhost:9092'})
 
 def delivery_report(err, msg):
     if err:
@@ -69,8 +69,7 @@ def validate_relay_notif(data_string):
         if req_content_type == MIME_APPLICATION_JSON:
             json_data = json.loads(data_string)
         elif req_content_type == MIME_APPLICATION_XML:
-            parsed_xml = xmltodict.parse(data_string, process_namespaces=False)
-            json_data = parsed_xml
+            json_data = xmltodict.parse(data_string, process_namespaces=False)           
             list_of_interfaces = json_data['ietf-https-notif:notification']['interface_data']['interface']
             
             # Ensure it's always a list
@@ -97,12 +96,14 @@ def validate_relay_notif(data_string):
             json_data['ietf-https-notif:notification']['interface_data']['interface'] = list_of_interfaces
 
         elif req_content_type == MIME_APPLICATION_CBOR:    
-            parsed_cbor = bytes.fromhex(data_string.decode('utf-8'))
-            json_data = cbor2.loads(parsed_cbor)
+            # parsed_cbor = bytes.fromhex(data_string.decode('utf-8'))
+            # json_data = cbor2.loads(parsed_cbor)
+            json_data = cbor2.loads(data_string)
         else:
             return 0, "Invalid Content-Type"
 
     except Exception as e:
+        print("data_String", data_string)
         app.logger.error(f"Parsing error: {e}")
         return 0, "Parsing error: invalid data format"
 
@@ -200,10 +201,8 @@ def respond_with_content_type(accept_header, json_capable, xml_capable, cbor_cap
 def get_capabilities():
     """Handles the /capabilities GET request."""
     capabilities_data = build_capabilities_data(json_capable, xml_capable, cbor_capable)
-    print(capabilities_data)
 
     accept_header = request.headers.get(UHTTPS_ACCEPT)
-    print(accept_header)
     if accept_header:
         return respond_with_content_type(accept_header, json_capable, xml_capable, cbor_capable, capabilities_data)
 
@@ -211,7 +210,7 @@ def get_capabilities():
 
 @app.route('/relay-notification', methods=['POST'])
 def post_notification():
-    print(f"Received notification at {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())}.{int(time.time() * 1000) % 1000:03d}")
+    # print(f"Received notification at {time.strftime('%Y-%m-%d %H:%M:%S', time.gmtime())}.{int(time.time() * 1000) % 1000:03d}")
     req_content_type = request.headers.get(UHTTPS_CONTENT_TYPE)
 
     if req_content_type is None:
@@ -233,29 +232,29 @@ def post_notification():
             return error_message, HTTPStatus.UNSUPPORTED_MEDIA_TYPE
         return error_message, HTTPStatus.BAD_REQUEST
 
-    try: 
-        data_string = request.data.decode('utf-8')
-        if req_content_type == MIME_APPLICATION_JSON:
-            message = json.loads(data_string)
-        elif req_content_type == MIME_APPLICATION_XML:
-            message = xmltodict.parse(data_string, process_namespaces=False)
-            message = strip_namespace(message)
-        elif req_content_type == MIME_APPLICATION_CBOR:
-            parsed_cbor = bytes.fromhex(data_string.decode('utf-8'))
-            message = cbor2.loads(parsed_cbor)
+    # try: 
+    #     data_string = request.data.decode('utf-8')
+    #     if req_content_type == MIME_APPLICATION_JSON:
+    #         message = json.loads(data_string)
+    #     elif req_content_type == MIME_APPLICATION_XML:
+    #         message = xmltodict.parse(data_string, process_namespaces=False)
+    #         message = strip_namespace(message)
+    #     elif req_content_type == MIME_APPLICATION_CBOR:
+    #         parsed_cbor = bytes.fromhex(data_string.decode('utf-8'))
+    #         message = cbor2.loads(parsed_cbor)
 
-    #  Produce message to Kafka 
-        producer.produce(
-            KAFKA_TOPIC_NAME,
-            key=None,
-            value=json.dumps(message),
-            callback=delivery_report
-        )
-        producer.flush()
-        app.logger.info(f"Message sent to Kafka topic '{KAFKA_TOPIC_NAME}': {message}")
-    except Exception as e:
-        app.logger.error(f"Error sending message to Kafka: {e}")
-        return "Internal Server Error", HTTPStatus.INTERNAL_SERVER_ERROR
+    # #  Produce message to Kafka 
+    #     producer.produce(
+    #         KAFKA_TOPIC_NAME,
+    #         key=None,
+    #         value=json.dumps(message),
+    #         callback=delivery_report
+    #     )
+    #     producer.flush()
+    #     app.logger.info(f"Message sent to Kafka topic '{KAFKA_TOPIC_NAME}': {message}")
+    # except Exception as e:
+    #     app.logger.error(f"Error sending message to Kafka: {e}")
+    #     return "Internal Server Error", HTTPStatus.INTERNAL_SERVER_ERROR
     
     POST_BODY_SIZE.set(len(request.data))
     return '', HTTPStatus.NO_CONTENT

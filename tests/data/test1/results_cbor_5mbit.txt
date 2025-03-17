@@ -1,19 +1,19 @@
 Running 30s test @ https://192.168.1.2:8080/relay-notification
   100 goroutine(s) running concurrently
-4754 requests in 30.230643972s, 543.18KB read
-Requests/sec:		157.26
-Transfer/sec:		17.97KB
-Overall Requests/sec:	155.90
-Overall Transfer/sec:	17.81KB
-Fastest Request:	66.112ms
-Avg Req Time:		635.899ms
-Slowest Request:	834.943ms
+4097 requests in 30.392533751s, 468.11KB read
+Requests/sec:		134.80
+Transfer/sec:		15.40KB
+Overall Requests/sec:	133.12
+Overall Transfer/sec:	15.21KB
+Fastest Request:	62.048ms
+Avg Req Time:		741.824ms
+Slowest Request:	970.463ms
 Number of Errors:	0
-10%:			86.627ms
-50%:			217.935ms
-75%:			296.607ms
-99%:			349.391ms
-99.9%:			349.391ms
-99.9999%:		353.823ms
-99.99999%:		353.823ms
-stddev:			72.291ms
+10%:			84.003ms
+50%:			212.023ms
+75%:			294.687ms
+99%:			375.647ms
+99.9%:			375.647ms
+99.9999%:		375.647ms
+99.99999%:		375.647ms
+stddev:			71.75ms
