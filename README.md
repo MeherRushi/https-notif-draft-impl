@@ -16,8 +16,6 @@ This repository implements the [https-notif draft](https://datatracker.ietf.org/
 ├── certs
 │   ├── server.crt
 │   └── server.key
-├── image-1.png
-├── image.png
 ├── installation.md
 ├── LICENSE.txt
 ├── python
@@ -34,7 +32,6 @@ This repository implements the [https-notif draft](https://datatracker.ietf.org/
 │   └── publisher
 │       └── publisher.py
 ├── README.md
-├── setup.png
 ├── tests
 │   ├── data
 │   │   ├── data.json
@@ -43,6 +40,8 @@ This repository implements the [https-notif draft](https://datatracker.ietf.org/
 │   │   ├── plot.py
 │   │   ├── script
 │   │   └── script2
+│   ├── image-1.png
+│   ├── image.png
 │   ├── lua
 │   │   ├── get_seq.lua
 │   │   ├── post_json.lua
@@ -50,8 +49,8 @@ This repository implements the [https-notif draft](https://datatracker.ietf.org/
 │   │   ├── rand_seq.lua
 │   │   ├── res_track.lua
 │   │   └── seq.lua
-│   └── README.md
-├── tree.txt
+│   ├── README.md
+│   └── setup.png
 ├── usage.md
 └── yang_modules
     ├── ietf-https-notif.yang
