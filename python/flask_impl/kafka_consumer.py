@@ -54,10 +54,8 @@ def consume_and_insert():
                 notification_data = data.get("ietf-https-notif:notification", data.get("notification", {}))
 
                 event_time = notification_data.get("eventTime", "")
-                event = notification_data.get("event", {})
-                event_class = event.get("event-class", "")
-                severity = event.get("severity", "")
-                reporting_entity = event.get("reporting-entity", {}).get("card", "")
+                interface_data = str(notification_data.get("interface_data", {}))
+                
 
                 
                 # Create a point for InfluxDB 
@@ -65,9 +63,7 @@ def consume_and_insert():
                     Point("ietf-https-notif:notification")  
                     .tag("source", "kafka")
                     .field("event_time", event_time)
-                    .field("event_class", event_class)
-                    .field("severity", severity)
-                    .field("reporting_entity", reporting_entity)
+                    .field("interface_data", interface_data)
                 )
                 
                 write_api.write(bucket=INFLUXDB_BUCKET, org=INFLUXDB_ORG, record=point)
