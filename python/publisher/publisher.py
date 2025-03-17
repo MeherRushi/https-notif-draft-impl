@@ -198,14 +198,13 @@ def main():
         publisher_print(capabilities_response.text,args.verbose)
         print("_"*20)
 
-        cbor_capabilities_exist = cbor_capabilities_check(capabilities, args)
         if 'json' in capabilities_response.text:
-            publisher_print("Receiver supports JSON encoding!",args.verbose)
+            publisher_print("Receiver supports JSON encoding!",args.verbose)    
         elif 'xml' in capabilities_response.text:
             publisher_print("Receiver supports XML encoding!",args.verbose)
-        elif cbor_capabilities_exist:
+        elif cbor_capabilities_check(capabilities, args):
             publisher_print("Receiver supports CBOR encoding!",args.verbose)
-        if 'json' not in capabilities_response.text and 'xml' not in capabilities_response.text and not cbor_capabilities_exist:
+        if 'json' not in capabilities_response.text and 'xml' not in capabilities_response.text and not cbor_capabilities_check(capabilities, args):
             publisher_print("Receiver does not support any valid encoding type!",args.verbose)
             raise AssertionError("Receiver does not support any valid encoding type!")
             
@@ -233,9 +232,11 @@ def main():
             elif 'xml' in capabilities.text:
                 payload = dicttoxml.dicttoxml(payload)
                 headers = {'Content-Type': 'application/xml'}
-            elif cbor_capabilities_exist:
+            elif cbor_capabilities_check(capabilities, args):
                 payload = cbor2.dumps(payload).hex()
                 headers = {'Content-Type': 'application/cbor'}
+            else :
+                raise AssertionError("Receiver does not support any valid encoding type!")
 
             notification_response = send_notification(notification_url, payload, headers)
             print("_"*20)
