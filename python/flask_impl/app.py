@@ -66,7 +66,6 @@ def strip_namespace(data):
 def validate_relay_notif(data_string):
     req_content_type = request.headers.get(UHTTPS_CONTENT_TYPE)
     # print(f"Original data string : {data_string}")
-
     try:
         if req_content_type == MIME_APPLICATION_JSON:
             json_data = json.loads(data_string)
@@ -75,34 +74,35 @@ def validate_relay_notif(data_string):
             json_data = parsed_xml
             list_of_interfaces = json_data['ietf-https-notif:notification']['interface_data']['interface']
             
-            # Ensure it's a list, even if only one interface exists
-            list_of_interfaces = [list_of_interfaces] if isinstance(list_of_interfaces, dict) else list_of_interfaces
+            # Ensure it's always a list
+            if isinstance(list_of_interfaces, dict):
+                list_of_interfaces = [list_of_interfaces]
+            
+            # Process each interface in the list
+            for interface in list_of_interfaces:
+                # Convert 'enabled' to boolean
+                interface['enabled'] = interface['enabled'] != 'false'
+                
+                # Convert 'if-index' to int
+                if isinstance(interface.get('if-index'), str):
+                    interface['if-index'] = int(interface['if-index'])
+                
+                # Convert statistics values to int
+                stats_keys = ['in-discards', 'in-errors', 'in-unknown-protos', 'out-discards', 'out-errors']
+                if 'statistics' in interface:
+                    for key in stats_keys:
+                        if key in interface['statistics'] and isinstance(interface['statistics'][key], str):
+                            interface['statistics'][key] = int(interface['statistics'][key])
+            
+            # Assign the updated list back to JSON structure
             json_data['ietf-https-notif:notification']['interface_data']['interface'] = list_of_interfaces
-            
-            # Convert 'enabled' to boolean
-            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['enabled'] = False if json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['enabled'] == 'false' else True
-            
-            # Convert 'if_index' to int
-            if isinstance(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['if-index'], str):
-                json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['if-index'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['if-index'])
 
-            # Convert 'in-discards', 'in-errors', 'in-unknown-protos' to int
-            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-discards'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-discards'])
-            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-errors'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-errors'])
-            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-unknown-protos'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-unknown-protos'])
-
-            # Convert 'out-discards', 'out-errors' to int
-            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['out-discards'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['out-discards'])
-            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['out-errors'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['out-errors'])
-                        
-        elif req_content_type == MIME_APPLICATION_CBOR :    
+        elif req_content_type == MIME_APPLICATION_CBOR:    
             parsed_cbor = bytes.fromhex(data_string.decode('utf-8'))
             json_data = cbor2.loads(parsed_cbor)
-            # print("*"*10)
-            # print(json_data)
-            # print(f"Parsed CBOR data : {parsed_cbor}")
         else:
             return 0, "Invalid Content-Type"
+
     except Exception as e:
         app.logger.error(f"Parsing error: {e}")
         return 0, "Parsing error: invalid data format"
@@ -110,10 +110,11 @@ def validate_relay_notif(data_string):
     try:
         instance = data_model.from_raw(json_data)
         instance.validate(ctype=ContentType.all)
-        return 1,None
+        return 1, None
     except Exception as e:
         app.logger.error(f"Validation error: {e}")
         return 0, "Validation error: data does not conform to the YANG module"
+
 
 def build_capabilities_data(json_capable, xml_capable, cbor_capable):
     capabilities_data = []
