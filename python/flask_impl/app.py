@@ -37,8 +37,8 @@ MIME_APPLICATION_JSON = "application/json"
 MIME_APPLICATION_CBOR = "application/cbor"  #Unsure about its existence.
 
 # collector capabilities
-json_capable = False
-xml_capable = False
+json_capable = True
+xml_capable = True
 cbor_capable = True
 
 # Define your YANG module path and model name
@@ -66,21 +66,36 @@ def strip_namespace(data):
 def validate_relay_notif(data_string):
     req_content_type = request.headers.get(UHTTPS_CONTENT_TYPE)
     # print(f"Original data string : {data_string}")
-    
 
     try:
         if req_content_type == MIME_APPLICATION_JSON:
             json_data = json.loads(data_string)
         elif req_content_type == MIME_APPLICATION_XML:
-            parsed_xml = xmltodict.parse(data_string, process_namespaces=True)
-            parsed_xml = strip_namespace(parsed_xml)
-            json_data = {
-                "ietf-https-notif:notification": {
-                    "eventTime": parsed_xml["notification"]["eventTime"],
-                    "event": parsed_xml["notification"]["event"]
-                }
-            }
-        elif req_content_type == MIME_APPLICATION_CBOR :
+            parsed_xml = xmltodict.parse(data_string, process_namespaces=False)
+            json_data = parsed_xml
+            list_of_interfaces = json_data['ietf-https-notif:notification']['interface_data']['interface']
+            
+            # Ensure it's a list, even if only one interface exists
+            list_of_interfaces = [list_of_interfaces] if isinstance(list_of_interfaces, dict) else list_of_interfaces
+            json_data['ietf-https-notif:notification']['interface_data']['interface'] = list_of_interfaces
+            
+            # Convert 'enabled' to boolean
+            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['enabled'] = False if json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['enabled'] == 'false' else True
+            
+            # Convert 'if_index' to int
+            if isinstance(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['if-index'], str):
+                json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['if-index'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['if-index'])
+
+            # Convert 'in-discards', 'in-errors', 'in-unknown-protos' to int
+            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-discards'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-discards'])
+            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-errors'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-errors'])
+            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-unknown-protos'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['in-unknown-protos'])
+
+            # Convert 'out-discards', 'out-errors' to int
+            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['out-discards'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['out-discards'])
+            json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['out-errors'] = int(json_data['ietf-https-notif:notification']['interface_data']['interface'][0]['statistics']['out-errors'])
+                        
+        elif req_content_type == MIME_APPLICATION_CBOR :    
             parsed_cbor = bytes.fromhex(data_string.decode('utf-8'))
             json_data = cbor2.loads(parsed_cbor)
             # print("*"*10)
@@ -218,13 +233,13 @@ def post_notification():
             return error_message, HTTPStatus.UNSUPPORTED_MEDIA_TYPE
         return error_message, HTTPStatus.BAD_REQUEST
 
-    try: 
-        data_string = request.data.decode('utf-8')
-        if req_content_type == MIME_APPLICATION_JSON:
-            message = json.loads(data_string)
-        elif req_content_type == MIME_APPLICATION_XML:
-            message = xmltodict.parse(data_string, process_namespaces=True)
-            message = strip_namespace(message)
+    # try: 
+    #     data_string = request.data.decode('utf-8')
+    #     if req_content_type == MIME_APPLICATION_JSON:
+    #         message = json.loads(data_string)
+    #     elif req_content_type == MIME_APPLICATION_XML:
+    #         message = xmltodict.parse(data_string, process_namespaces=True)
+    #         message = strip_namespace(message)
 
      # Produce message to Kafka 
         # producer.produce(
@@ -235,9 +250,9 @@ def post_notification():
         # )
         # producer.flush()
         # app.logger.info(f"Message sent to Kafka topic '{KAFKA_TOPIC_NAME}': {message}")
-    except Exception as e:
-        app.logger.error(f"Error sending message to Kafka: {e}")
-        return "Internal Server Error", HTTPStatus.INTERNAL_SERVER_ERROR
+    # except Exception as e:
+    #     app.logger.error(f"Error sending message to Kafka: {e}")
+    #     return "Internal Server Error", HTTPStatus.INTERNAL_SERVER_ERROR
     
     POST_BODY_SIZE.set(len(request.data))
     return '', HTTPStatus.NO_CONTENT

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BANDWIDTHS=("1mbit" "5mbit" "10mbit" "50mbit" "100mbit" "500mbit" "1gbit")
-ENCODINGS=("json" "xml" "cbor")
+ENCODINGS=("cbor" "json" "xml" )
 BURST="128kbit"       # Adjust as per your requirement
 LATENCY="5000ms"       # The maximum amount of time the packet is delayed in the queue
 
