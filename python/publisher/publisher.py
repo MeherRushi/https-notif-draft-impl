@@ -123,10 +123,7 @@ def valid_ipv4_ipv6(addr):
 
 def cbor_capabilities_check(capabilities, args):
     try:
-        publisher_print(f"Unparsed capabilities response : {capabilities.text.encode()}",args)
         parsed = cbor2.loads(bytes.fromhex(capabilities.text))
-        publisher_print(f"CBOR capabilities fresponse, parsed: {parsed}",args.verbose)
-
         if any('cbor' in str(value) for value in parsed.values()):
             return True
         else:
@@ -237,7 +234,7 @@ def main():
                     f.write(payload)
                 headers = {'Content-Type': 'application/xml'}
             elif cbor_capabilities_check(capabilities, args):
-                payload_cbor = cbor2.dumps(payload)
+                payload = cbor2.dumps(payload)
                 headers = {'Content-Type': 'application/cbor'}
             else :
                 raise AssertionError("Receiver does not support any valid encoding type!")

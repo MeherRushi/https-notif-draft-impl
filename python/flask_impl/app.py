@@ -37,8 +37,8 @@ MIME_APPLICATION_JSON = "application/json"
 MIME_APPLICATION_CBOR = "application/cbor"  #Unsure about its existence.
 
 # collector capabilities
-json_capable = True
-xml_capable = True
+json_capable = False
+xml_capable = False
 cbor_capable = True
 
 # Define your YANG module path and model name
@@ -96,8 +96,6 @@ def validate_relay_notif(data_string):
             json_data['ietf-https-notif:notification']['interface_data']['interface'] = list_of_interfaces
 
         elif req_content_type == MIME_APPLICATION_CBOR:    
-            # parsed_cbor = bytes.fromhex(data_string.decode('utf-8'))
-            # json_data = cbor2.loads(parsed_cbor)
             json_data = cbor2.loads(data_string)
         else:
             return 0, "Invalid Content-Type"
