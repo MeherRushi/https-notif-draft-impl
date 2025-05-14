@@ -98,7 +98,6 @@ def fetch_data():
         for line in data:
             
             interface_name =line[0: line.find(':')]
-            print(interface_name)
             interface_data_combined = line[line.find(':')+1:]
             split_data = re.findall(r'\d+', interface_data_combined)
             
@@ -220,7 +219,6 @@ def main():
                     }
                 }
             }
-            # print(payload)
             
             headers = None
             if 'json' in capabilities.text:
@@ -228,8 +226,6 @@ def main():
                 headers = {'Content-Type': 'application/json'}
             elif 'xml' in capabilities.text:
                 payload= xmltodict.unparse(payload, full_document=False)
-                print(payload)
-                # payload = dicttoxml.dicttoxml(payload, root=False, attr_type=False,item_func=lambda x: 'interface')
                 with open("data.xml", "w") as f:
                     f.write(payload)
                 headers = {'Content-Type': 'application/xml'}
