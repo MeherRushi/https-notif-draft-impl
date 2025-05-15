@@ -15,7 +15,7 @@ pip install requirements.txt
 
 - dev
 ```bash
-flask run --host=127.0.0.1 --port=8080 --cert=../../certs/server.crt --key=../../certs/server.key
+flask run --host=0.0.0.0 --port=8080 --cert=../../certs/server.crt --key=../../certs/server.key
 ```
 
 - prod
