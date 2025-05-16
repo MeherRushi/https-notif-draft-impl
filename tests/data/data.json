@@ -1,1 +1,184 @@
-{"ietf-https-notif:notification": {"eventTime": "2025-03-17T19:43:27.972894Z", "interface_data": {"interface": [{"name": "wlp2s0", "description": "", "type": "1", "enabled": true, "admin-status": "up", "oper-status": "up", "if-index": 2, "phys-address": "3c:91:80:2b:68:23", "higher-layer-if": [], "lower-layer-if": [], "speed": "0", "statistics": {"discontinuity-time": "2025-03-17T19:43:27.952507Z", "in-octets": "1592834446", "in-unicast-pkts": "5375799", "in-multicast-pkts": "0", "in-discards": 24880, "in-errors": 0, "out-octets": "70768027", "out-unicast-pkts": "173281", "out-discards": 0, "out-errors": 0}}, {"name": "br-910b760a58dc", "description": "", "type": "1", "enabled": false, "admin-status": "down", "oper-status": "down", "if-index": 3, "phys-address": "02:42:c0:33:32:37", "higher-layer-if": [], "lower-layer-if": [], "speed": "0", "statistics": {"discontinuity-time": "2025-03-17T19:43:27.955690Z", "in-octets": "0", "in-unicast-pkts": "0", "in-multicast-pkts": "0", "in-discards": 0, "in-errors": 0, "out-octets": "0", "out-unicast-pkts": "0", "out-discards": 0, "out-errors": 0}}, {"name": "br0", "description": "", "type": "1", "enabled": true, "admin-status": "up", "oper-status": "up", "if-index": 5, "phys-address": "da:4a:7d:24:dd:33", "higher-layer-if": [], "lower-layer-if": [], "speed": "0", "statistics": {"discontinuity-time": "2025-03-17T19:43:27.958623Z", "in-octets": "2012", "in-unicast-pkts": "33", "in-multicast-pkts": "32", "in-discards": 0, "in-errors": 0, "out-octets": "6068", "out-unicast-pkts": "52", "out-discards": 0, "out-errors": 0}}, {"name": "docker0", "description": "", "type": "1", "enabled": false, "admin-status": "down", "oper-status": "down", "if-index": 4, "phys-address": "02:42:05:83:6b:7b", "higher-layer-if": [], "lower-layer-if": [], "speed": "0", "statistics": {"discontinuity-time": "2025-03-17T19:43:27.962795Z", "in-octets": "0", "in-unicast-pkts": "0", "in-multicast-pkts": "0", "in-discards": 0, "in-errors": 0, "out-octets": "0", "out-unicast-pkts": "0", "out-discards": 0, "out-errors": 0}}, {"name": "lo", "description": "", "type": "772", "enabled": true, "admin-status": "testing", "oper-status": "unknown", "if-index": 1, "phys-address": "00:00:00:00:00:00", "higher-layer-if": [], "lower-layer-if": [], "speed": "0", "statistics": {"discontinuity-time": "2025-03-17T19:43:27.965362Z", "in-octets": "10222658", "in-unicast-pkts": "52836", "in-multicast-pkts": "0", "in-discards": 0, "in-errors": 0, "out-octets": "10222658", "out-unicast-pkts": "52836", "out-discards": 0, "out-errors": 0}}, {"name": "veth3", "description": "", "type": "1", "enabled": true, "admin-status": "up", "oper-status": "up", "if-index": 8, "phys-address": "5a:07:2b:6c:20:de", "higher-layer-if": [], "lower-layer-if": [], "speed": "0", "statistics": {"discontinuity-time": "2025-03-17T19:43:27.968879Z", "in-octets": "393086799", "in-unicast-pkts": "2447215", "in-multicast-pkts": "0", "in-discards": 0, "in-errors": 0, "out-octets": "454073677", "out-unicast-pkts": "2470847", "out-discards": 0, "out-errors": 0}}, {"name": "veth1", "description": "", "type": "1", "enabled": true, "admin-status": "up", "oper-status": "up", "if-index": 6, "phys-address": "12:43:1b:3f:fe:8d", "higher-layer-if": [], "lower-layer-if": [], "speed": "0", "statistics": {"discontinuity-time": "2025-03-17T19:43:27.972562Z", "in-octets": "454063742", "in-unicast-pkts": "2470760", "in-multicast-pkts": "0", "in-discards": 0, "in-errors": 0, "out-octets": "393096934", "out-unicast-pkts": "2447304", "out-discards": 0, "out-errors": 0}}]}}}
+{
+    "ietf-https-notif:notification": {
+        "eventTime": "2025-03-17T19:43:27.972894Z",
+        "interface_data": {
+            "interface": [
+                {
+                    "name": "wlp2s0",
+                    "description": "",
+                    "type": "1",
+                    "enabled": true,
+                    "admin-status": "up",
+                    "oper-status": "up",
+                    "if-index": 2,
+                    "phys-address": "3c:91:80:2b:68:23",
+                    "higher-layer-if": [],
+                    "lower-layer-if": [],
+                    "speed": "0",
+                    "statistics": {
+                        "discontinuity-time": "2025-03-17T19:43:27.952507Z",
+                        "in-octets": "1592834446",
+                        "in-unicast-pkts": "5375799",
+                        "in-multicast-pkts": "0",
+                        "in-discards": 24880,
+                        "in-errors": 0,
+                        "out-octets": "70768027",
+                        "out-unicast-pkts": "173281",
+                        "out-discards": 0,
+                        "out-errors": 0
+                    }
+                },
+                {
+                    "name": "br-910b760a58dc",
+                    "description": "",
+                    "type": "1",
+                    "enabled": false,
+                    "admin-status": "down",
+                    "oper-status": "down",
+                    "if-index": 3,
+                    "phys-address": "02:42:c0:33:32:37",
+                    "higher-layer-if": [],
+                    "lower-layer-if": [],
+                    "speed": "0",
+                    "statistics": {
+                        "discontinuity-time": "2025-03-17T19:43:27.955690Z",
+                        "in-octets": "0",
+                        "in-unicast-pkts": "0",
+                        "in-multicast-pkts": "0",
+                        "in-discards": 0,
+                        "in-errors": 0,
+                        "out-octets": "0",
+                        "out-unicast-pkts": "0",
+                        "out-discards": 0,
+                        "out-errors": 0
+                    }
+                },
+                {
+                    "name": "br0",
+                    "description": "",
+                    "type": "1",
+                    "enabled": true,
+                    "admin-status": "up",
+                    "oper-status": "up",
+                    "if-index": 5,
+                    "phys-address": "da:4a:7d:24:dd:33",
+                    "higher-layer-if": [],
+                    "lower-layer-if": [],
+                    "speed": "0",
+                    "statistics": {
+                        "discontinuity-time": "2025-03-17T19:43:27.958623Z",
+                        "in-octets": "2012",
+                        "in-unicast-pkts": "33",
+                        "in-multicast-pkts": "32",
+                        "in-discards": 0,
+                        "in-errors": 0,
+                        "out-octets": "6068",
+                        "out-unicast-pkts": "52",
+                        "out-discards": 0,
+                        "out-errors": 0
+                    }
+                },
+                {
+                    "name": "docker0",
+                    "description": "",
+                    "type": "1",
+                    "enabled": false,
+                    "admin-status": "down",
+                    "oper-status": "down",
+                    "if-index": 4,
+                    "phys-address": "02:42:05:83:6b:7b",
+                    "higher-layer-if": [],
+                    "lower-layer-if": [],
+                    "speed": "0",
+                    "statistics": {
+                        "discontinuity-time": "2025-03-17T19:43:27.962795Z",
+                        "in-octets": "0",
+                        "in-unicast-pkts": "0",
+                        "in-multicast-pkts": "0",
+                        "in-discards": 0,
+                        "in-errors": 0,
+                        "out-octets": "0",
+                        "out-unicast-pkts": "0",
+                        "out-discards": 0,
+                        "out-errors": 0
+                    }
+                },
+                {
+                    "name": "lo",
+                    "description": "",
+                    "type": "772",
+                    "enabled": true,
+                    "admin-status": "testing",
+                    "oper-status": "unknown",
+                    "if-index": 1,
+                    "phys-address": "00:00:00:00:00:00",
+                    "higher-layer-if": [],
+                    "lower-layer-if": [],
+                    "speed": "0",
+                    "statistics": {
+                        "discontinuity-time": "2025-03-17T19:43:27.965362Z",
+                        "in-octets": "10222658",
+                        "in-unicast-pkts": "52836",
+                        "in-multicast-pkts": "0",
+                        "in-discards": 0,
+                        "in-errors": 0,
+                        "out-octets": "10222658",
+                        "out-unicast-pkts": "52836",
+                        "out-discards": 0,
+                        "out-errors": 0
+                    }
+                },
+                {
+                    "name": "veth3",
+                    "description": "",
+                    "type": "1",
+                    "enabled": true,
+                    "admin-status": "up",
+                    "oper-status": "up",
+                    "if-index": 8,
+                    "phys-address": "5a:07:2b:6c:20:de",
+                    "higher-layer-if": [],
+                    "lower-layer-if": [],
+                    "speed": "0",
+                    "statistics": {
+                        "discontinuity-time": "2025-03-17T19:43:27.968879Z",
+                        "in-octets": "393086799",
+                        "in-unicast-pkts": "2447215",
+                        "in-multicast-pkts": "0",
+                        "in-discards": 0,
+                        "in-errors": 0,
+                        "out-octets": "454073677",
+                        "out-unicast-pkts": "2470847",
+                        "out-discards": 0,
+                        "out-errors": 0
+                    }
+                },
+                {
+                    "name": "veth1",
+                    "description": "",
+                    "type": "1",
+                    "enabled": true,
+                    "admin-status": "up",
+                    "oper-status": "up",
+                    "if-index": 6,
+                    "phys-address": "12:43:1b:3f:fe:8d",
+                    "higher-layer-if": [],
+                    "lower-layer-if": [],
+                    "speed": "0",
+                    "statistics": {
+                        "discontinuity-time": "2025-03-17T19:43:27.972562Z",
+                        "in-octets": "454063742",
+                        "in-unicast-pkts": "2470760",
+                        "in-multicast-pkts": "0",
+                        "in-discards": 0,
+                        "in-errors": 0,
+                        "out-octets": "393096934",
+                        "out-unicast-pkts": "2447304",
+                        "out-discards": 0,
+                        "out-errors": 0
+                    }
+                }
+            ]
+        }
+    }
+}
