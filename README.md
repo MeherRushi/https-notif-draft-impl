@@ -18,6 +18,7 @@ This enables a secure and flexible mechanism for delivering event notifications 
 -  **Presentation at IETF**  
   We presented our CBOR extension and implementation at an IETF meeting:  
   [Watch the presentation](https://youtu.be/VVUIz-OsGbo?t=6371)
+  [Link to the presentation](https://docs.google.com/presentation/d/1Vq_B4UCnd5zAnCFKM8eMgZWqTdhEmGKZ5Ca9AF80vXA/edit?usp=sharing)
 
 ##  Goal
 
@@ -31,7 +32,8 @@ Feel free to open issues or contribute if you'd like to extend or integrate this
 ## Features
 
 - **Multi-Framework Support**: Implementations in Python (Flask and Fast API).
-- **Testing**: Performance tests using `go-wrk`. See [Testing](tests/README.md) for more information
+- **Performance Analysis**: Performance Analysis of Encoding Formats Under Varying Bandwidth
+on local system using `venv setup` and `go-wrk`. See [perf_analysis](perf_analysis/README.md) for more information
 
 ## Getting Started
 
@@ -40,72 +42,65 @@ Feel free to open issues or contribute if you'd like to extend or integrate this
 ```bash
 .
 ├── certs
-│   ├── server.crt
-│   └── server.key
+│   ├── server.crt
+│   └── server.key
 ├── installation.md
 ├── LICENSE.txt
+├── perf_analysis
+│   ├── data
+│   │   ├── data.cbor
+│   │   ├── data.json
+│   │   ├── data.xml
+│   │   ├── gowrk_script
+│   │   ├── plot.py
+│   │   ├── stats.png
+│   │   └── test1
+│   │       ├── results_cbor_100mbit.txt
+│   │       ├── results_cbor_10mbit.txt
+│   │       ├── results_cbor_1gbit.txt
+│   │       ├── results_cbor_1mbit.txt
+│   │       ├── results_cbor_500mbit.txt
+│   │       ├── results_cbor_50mbit.txt
+│   │       ├── results_cbor_5mbit.txt
+│   │       ├── results_json_100mbit.txt
+│   │       ├── results_json_10mbit.txt
+│   │       ├── results_json_1gbit.txt
+│   │       ├── results_json_1mbit.txt
+│   │       ├── results_json_500mbit.txt
+│   │       ├── results_json_50mbit.txt
+│   │       ├── results_json_5mbit.txt
+│   │       ├── results_xml_100mbit.txt
+│   │       ├── results_xml_10mbit.txt
+│   │       ├── results_xml_1gbit.txt
+│   │       ├── results_xml_1mbit.txt
+│   │       ├── results_xml_500mbit.txt
+│   │       ├── results_xml_50mbit.txt
+│   │       └── results_xml_5mbit.txt
+│   ├── README.md
+│   ├── setup.png
+│   └── test_bed_setup.md
 ├── python
-│   ├── fast_api_impl
-│   │   ├── main.py
-│   │   └── README.md
-│   ├── flask_impl
-│   │   ├── app.py
-│   │   ├── docker-compose.yml
-│   │   ├── kafka_consumer.py
-│   │   ├── prometheus.yml
-│   │   ├── __pycache__
-│   │   │   ├── app.cpython-312.pyc
-│   │   │   └── app.cpython-38.pyc
-│   │   ├── read_db.py
-│   │   ├── README.md
-│   │   └── requirements.txt
-│   ├── publisher
-│   │   ├── data.xml
-│   │   ├── publisher.py
-│   │   └── requirements.txt
+│   ├── fast_api_impl
+│   │   ├── main.py
+│   │   ├── __pycache__
+│   │   │   └── main.cpython-312.pyc
+│   │   └── README.md
+│   ├── flask_impl
+│   │   ├── app.py
+│   │   ├── docker-compose.yml
+│   │   ├── kafka_consumer.py
+│   │   ├── prometheus.yml
+│   │   ├── __pycache__
+│   │   │   ├── app.cpython-310.pyc
+│   │   │   └── app.cpython-312.pyc
+│   │   ├── read_db.py
+│   │   ├── README.md
+│   │   └── requirements.txt
+│   └── publisher
+│       ├── data.xml
+│       ├── publisher.py
+│       └── requirements.txt
 ├── README.md
-├── tests
-│   ├── data
-│   │   ├── data.cbor
-│   │   ├── data.json
-│   │   ├── data.xml
-│   │   ├── gowrk_script
-│   │   ├── plot.py
-│   │   ├── script
-│   │   ├── script2
-│   │   └── test1
-│   │       ├── results_cbor_100mbit.txt
-│   │       ├── results_cbor_10mbit.txt
-│   │       ├── results_cbor_1gbit.txt
-│   │       ├── results_cbor_1mbit.txt
-│   │       ├── results_cbor_500mbit.txt
-│   │       ├── results_cbor_50mbit.txt
-│   │       ├── results_cbor_5mbit.txt
-│   │       ├── results_json_100mbit.txt
-│   │       ├── results_json_10mbit.txt
-│   │       ├── results_json_1gbit.txt
-│   │       ├── results_json_1mbit.txt
-│   │       ├── results_json_500mbit.txt
-│   │       ├── results_json_50mbit.txt
-│   │       ├── results_json_5mbit.txt
-│   │       ├── results_xml_100mbit.txt
-│   │       ├── results_xml_10mbit.txt
-│   │       ├── results_xml_1gbit.txt
-│   │       ├── results_xml_1mbit.txt
-│   │       ├── results_xml_500mbit.txt
-│   │       ├── results_xml_50mbit.txt
-│   │       └── results_xml_5mbit.txt
-│   ├── image-1.png
-│   ├── image.png
-│   ├── lua
-│   │   ├── get_seq.lua
-│   │   ├── post_json.lua
-│   │   ├── post_xml.lua
-│   │   ├── rand_seq.lua
-│   │   ├── res_track.lua
-│   │   └── seq.lua
-│   ├── README.md
-│   └── setup.png
 ├── usage.md
 └── yang_modules
     ├── ietf-https-notif.yang

@@ -1,0 +1,43 @@
+#!/bin/bash
+
+BANDWIDTHS=("1mbit" "5mbit" "10mbit" "50mbit" "100mbit" "500mbit" "1gbit")
+ENCODINGS=("xml" "json" "cbor")
+BURST="128kbit"       # Adjust as per your requirement
+LATENCY="5000ms"      # The maximum amount of time the packet is delayed in the queue
+
+# IP address of the collector (server) namespace
+SERVER_IP="192.168.1.2:8080"
+
+sudo ip netns exec publisher_ns tc qdisc add dev veth0 root tbf rate 1mbit burst $BURST latency $LATENCY 2>/dev/null
+sudo ip netns exec collector_ns tc qdisc add dev veth2 root tbf rate  burst $BURST latency $LATENCY 2>/dev/null
+
+for bw in "${BANDWIDTHS[@]}"; do
+    echo "Setting bandwidth to $bw with burst $BURST and latency $LATENCY"
+
+    # Ensure the qdisc exists by adding it first
+    sudo ip netns exec publisher_ns tc qdisc change dev veth0 root tbf rate $bw burst $BURST latency $LATENCY
+    sudo ip netns exec collector_ns tc qdisc change dev veth2 root tbf rate $bw burst $BURST latency $LATENCY
+
+    for encoding in "${ENCODINGS[@]}"; do
+        case "$encoding" in
+            "json")
+                body_file="data.json"
+                content_type="application/json"
+                ;;
+            "xml")
+                body_file="data.xml"
+                content_type="application/xml"
+                ;;
+            "cbor")
+                body_file="data.cbor"
+                content_type="application/cbor"
+                ;;
+        esac
+
+        echo "Testing $encoding at $bw bandwidth"
+        sudo ip netns exec publisher_ns go-wrk -no-vr -M POST -c 100 -d 30 -cpus 2 \
+            -H "Content-Type: $content_type" -body @$body_file \
+            https://${SERVER_IP}/relay-notification > results_${encoding}_${bw}.txt
+    done
+done
+
