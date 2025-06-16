@@ -170,9 +170,20 @@ def main():
 
         time_interval = args.time if args.time else 2
         
-        if( not valid_ipv4_ipv6(args.ip)):
-            print("Invalid IP Address")
-            raise AssertionError("Invalid IPV4/IPV6 address")
+        is_literal_ip = valid_ipv4_ipv6(args.ip)
+        if not is_literal_ip:
+            if any(c.isalpha() for c in args.ip):
+                publisher_print(f"Assuming '{args.ip}' is a hostname (e.g., Docker service name), skipping IP format validation.", args.verbose)
+            else:
+                print(f"Invalid IP Address format for '{args.ip}'")
+                raise AssertionError("Invalid IPV4/IPV6 address format (expected literal IP or hostname).")
+
+        if(args.port):
+            capabilities_url = f"https://{args.ip}:{args.port}/capabilities"
+            notification_url = f"https://{args.ip}:{args.port}/relay-notification"
+        else:
+            capabilities_url = f"https://{args.ip}/capabilities"
+            notification_url = f"https://{args.ip}/relay-notification"
 
         
         if(args.port):

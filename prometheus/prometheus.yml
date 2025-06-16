@@ -7,4 +7,4 @@ scrape_configs:
     tls_config:
       insecure_skip_verify: true
     static_configs:
-      - targets: ['172.17.0.1:8080'] 
+      - targets: ['flask_collector:8080']

@@ -25,3 +25,4 @@ tables = query_api.query(query)
 for table in tables:
     for record in table.records:
         print(record)
+        print('----------------------------------------------------------------------------------------------------------------------')

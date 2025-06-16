@@ -9,7 +9,7 @@ import os
 load_dotenv()
 
 # Kafka configuration
-KAFKA_BROKER = "localhost:9092"
+KAFKA_BROKER = "kafka:9092"
 KAFKA_TOPIC = "test-topic"
 GROUP_ID = "influxdb-consumer-group"
 
@@ -22,7 +22,7 @@ consumer_config = {
 consumer = Consumer(consumer_config)
 consumer.subscribe([KAFKA_TOPIC])
 
-INFLUXDB_URL = "http://localhost:8086"
+INFLUXDB_URL = "http://influxdb:8086"
 INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
 INFLUXDB_ORG = os.getenv("INFLUXDB_ORG")
 INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")

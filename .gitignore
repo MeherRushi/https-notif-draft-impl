@@ -3,3 +3,4 @@ python/fast_api_impl/__pycache__/
 certs/cert.pem
 certs/key.pem
 tests/ebpf
+venv/

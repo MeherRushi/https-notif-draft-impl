@@ -1,0 +1,152 @@
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    hostname: zookeeper
+    container_name: zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    networks:
+      - kafka_influxdb_network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "echo ruok | nc localhost 2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    container_name: kafka
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    depends_on:
+      zookeeper:
+        condition: service_healthy 
+    networks:
+      - kafka_influxdb_network
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  kafka-topic-creator:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: kafka_topic_creator
+    command: >
+      sh -c "kafka-topics --bootstrap-server kafka:9092 --create --if-not-exists --topic test-topic --partitions 1 --replication-factor 1 && echo 'Topic test-topic created (or already exists).'"
+    depends_on:
+      kafka:
+        condition: service_healthy 
+    networks:
+      - kafka_influxdb_network
+    restart: "no"
+
+  influxdb:
+    image: influxdb:latest
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: ${INFLUXDB_USERNAME}
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_PASSWORD}
+      DOCKER_INFLUXDB_INIT_ORG: ${INFLUXDB_ORG}
+      DOCKER_INFLUXDB_INIT_BUCKET: ${INFLUXDB_BUCKET}
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_ADMIN_TOKEN}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    depends_on:
+      - kafka-topic-creator
+    networks:
+      - kafka_influxdb_network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - kafka_influxdb_network
+    depends_on:
+      - flask_collector
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: "admin"
+    depends_on:
+      - prometheus
+    networks:
+      - kafka_influxdb_network
+
+  flask_collector:
+    build:
+      context: .
+      dockerfile: ./python/flask_impl/Dockerfile
+    container_name: flask_collector
+    ports:
+      - "8080:8080"
+    depends_on:
+      kafka:
+        condition: service_healthy
+      influxdb:
+        condition: service_started
+      kafka-topic-creator:
+        condition: service_completed_successfully
+    networks:
+      - kafka_influxdb_network
+
+  kafka_consumer_app:
+    build:
+      context: ./python/flask_impl
+      dockerfile: kafka_consumer.Dockerfile
+    container_name: kafka_consumer_app
+    environment:
+      INFLUXDB_TOKEN: ${INFLUXDB_TOKEN}
+      INFLUXDB_ORG: ${INFLUXDB_ORG}
+      INFLUXDB_BUCKET: ${INFLUXDB_BUCKET}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      influxdb:
+        condition: service_started
+      kafka-topic-creator:
+        condition: service_completed_successfully
+    networks:
+      - kafka_influxdb_network
+  publisher:
+    build:
+      context: ./python/publisher
+      dockerfile: Dockerfile
+    container_name: publisher_app
+    depends_on:
+      flask_collector:
+        condition: service_started
+    networks:
+      - kafka_influxdb_network
+    command: ["python", "publisher.py", "flask_collector", "--port", "8080", "--time", "5", "--verbose"]
+
+
+volumes:
+  influxdb-data:
+  prometheus-data: 
+  
+networks:
+  kafka_influxdb_network:
+    name: kafka_influxdb_network
