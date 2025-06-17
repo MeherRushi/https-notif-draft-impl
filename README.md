@@ -39,18 +39,23 @@ on local system using `venv setup` and `go-wrk`. See [perf_analysis](perf_analys
 
 #### Folder structure: 
 
-```bash
+Here's your cleaned-up project structure, with temporary and generated files/folders like `__pycache__` and unnecessary `data.xml` instances removed.
+
+---
+
+```
 .
 ├── certs
 │   ├── server.crt
 │   └── server.key
-├── installation.md
+├── docker-compose.yml
+├── INSTALLATION.md
 ├── LICENSE.txt
 ├── perf_analysis
 │   ├── data
-│   │   ├── data.cbor
-│   │   ├── data.json
-│   │   ├── data.xml
+│   │   ├── data.cbor             
+│   │   ├── data.json             
+│   │   ├── data.xml              
 │   │   ├── gowrk_script
 │   │   ├── plot.py
 │   │   ├── stats.png
@@ -79,36 +84,35 @@ on local system using `venv setup` and `go-wrk`. See [perf_analysis](perf_analys
 │   ├── README.md
 │   ├── setup.png
 │   └── test_bed_setup.md
+├── prometheus
+│   └── prometheus.yml
 ├── python
 │   ├── fast_api_impl
 │   │   ├── main.py
-│   │   ├── __pycache__
-│   │   │   └── main.cpython-312.pyc
 │   │   └── README.md
 │   ├── flask_impl
 │   │   ├── app.py
-│   │   ├── docker-compose.yml
+│   │   ├── Dockerfile
+│   │   ├── kafka_consumer.Dockerfile
 │   │   ├── kafka_consumer.py
-│   │   ├── prometheus.yml
-│   │   ├── __pycache__
-│   │   │   ├── app.cpython-310.pyc
-│   │   │   └── app.cpython-312.pyc
 │   │   ├── read_db.py
 │   │   ├── README.md
 │   │   └── requirements.txt
 │   └── publisher
-│       ├── data.xml
+│       ├── Dockerfile
 │       ├── publisher.py
 │       └── requirements.txt
 ├── README.md
-├── usage.md
+├── USAGE.md
 └── yang_modules
     ├── ietf-https-notif.yang
     ├── ietf-yang-types.yang
     └── yang-library.json
+
 ```
 
-For detailed instructions, see [Installation](installation.md) and [Usage](usage.md).
+---
+For detailed instructions, see [INSTALLATION](INSTALLATION.md) and [USAGE](USAGE.md).
 
 ## Contributing
 
