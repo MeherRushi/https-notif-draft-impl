@@ -34,12 +34,17 @@ UHTTPS_ACCEPT = 'Accept'
 # Define constants for media types
 MIME_APPLICATION_XML = "application/xml"
 MIME_APPLICATION_JSON = "application/json"
-MIME_APPLICATION_CBOR = "application/cbor"  #Unsure about its existence.
+MIME_APPLICATION_CBOR = "application/cbor"  # proposed by draft-chittapragada-netconf-https-notif-cbor
 
 # collector capabilities
 json_capable = True
 xml_capable = True
 cbor_capable = True
+
+# collector reply preferences
+reply_support_json = True
+reply_support_xml = True
+reply_support_cbor = True
 
 # Define your YANG module path and model name
 yang_dir_path = "../../yang_modules/"
@@ -159,17 +164,17 @@ def get_q_value(accept_header, media_type):
         return float(q_value) if q_value else 1.0
     return 0.0
 
-def get_default_response(json_capable, xml_capable, cbor_capable, capabilities_data):
+def get_default_response(reply_support_json, reply_support_xml, reply_support_cbor, capabilities_data):
     """Returns the default response based on capabilities."""
-    if xml_capable:
+    if reply_support_xml:
         return build_xml(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_XML}
-    elif json_capable:
+    elif reply_support_json:
         return build_json(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_JSON}
-    elif cbor_capable:
+    elif reply_support_cbor:
         return build_cbor(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_CBOR}
     return jsonify({"error": "No valid capabilities found"}), HTTPStatus.INTERNAL_SERVER_ERROR
 
-def respond_with_content_type(accept_header, json_capable, xml_capable, cbor_capable, capabilities_data):
+def respond_with_content_type(accept_header, reply_support_json, reply_support_xml, reply_support_cbor, capabilities_data):
     """Responds based on the Accept header and content capabilities, considering q-values."""
     q_xml = get_q_value(accept_header, MIME_APPLICATION_XML)
     q_json = get_q_value(accept_header, MIME_APPLICATION_JSON)
@@ -179,17 +184,14 @@ def respond_with_content_type(accept_header, json_capable, xml_capable, cbor_cap
         return jsonify({"error": "Invalid q value"}), HTTPStatus.BAD_REQUEST
 
     if q_json == 0 and q_xml == 0 and q_cbor == 0:
-        return get_default_response(json_capable, xml_capable, cbor_capable, capabilities_data)
-
-    if(xml_capable and (q_xml >= q_json and q_xml >= q_cbor)):
-        return build_xml(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_XML}
+        return get_default_response(reply_support_json, reply_support_xml, reply_support_cbor, capabilities_data)
     
     q_max = max(q_xml,q_json,q_cbor)
-    if q_max == q_xml and xml_capable:
+    if q_max == q_xml and reply_support_xml:
         return build_xml(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_XML}
-    elif q_max == q_json and json_capable:
+    elif q_max == q_json and reply_support_json:
         return build_json(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_JSON}
-    elif q_max == q_cbor and cbor_capable:
+    elif q_max == q_cbor and reply_support_cbor:
         return build_cbor(capabilities_data), HTTPStatus.OK, {'Content-Type': MIME_APPLICATION_CBOR}
 
     return jsonify({"error": "Not acceptable"}), HTTPStatus.NOT_ACCEPTABLE
@@ -200,10 +202,11 @@ def get_capabilities():
     capabilities_data = build_capabilities_data(json_capable, xml_capable, cbor_capable)
 
     accept_header = request.headers.get(UHTTPS_ACCEPT)
+    print(f"Accept header: {accept_header}")
     if accept_header:
-        return respond_with_content_type(accept_header, json_capable, xml_capable, cbor_capable, capabilities_data)
+        return respond_with_content_type(accept_header, reply_support_json, reply_support_xml, reply_support_xml, capabilities_data)
 
-    return get_default_response(json_capable, xml_capable, cbor_capable, capabilities_data)
+    return get_default_response(reply_support_json, reply_support_xml, reply_support_cbor, capabilities_data)
 
 @app.route('/relay-notification', methods=['POST'])
 def post_notification():
