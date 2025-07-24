@@ -150,7 +150,31 @@ def publisher_print(message, verbose=False):
     if verbose:
         print(message)
 
+def parse_supported_encodings(capabilities_response):
+    content_type = capabilities_response.headers.get('Content-Type', '')
+    encodings = []
 
+    if 'application/json' in content_type:
+        data = capabilities_response.json()
+        caps = data.get("receiver-capabilities", {}).get("receiver-capability", [])
+        encodings = [cap.split(":")[-1] for cap in caps if "encoding" in cap]
+    elif 'application/xml' in content_type:
+        data = xmltodict.parse(capabilities_response.text)
+        caps = data.get("receiver-capabilities", {}).get("receiver-capability", [])
+        if isinstance(caps, str):
+            caps = [caps]
+        encodings = [cap.split(":")[-1] for cap in caps if "encoding" in cap]
+    elif 'application/cbor' in content_type:
+        data = cbor2.loads(capabilities_response.content)
+        caps = data.get("receiver-capabilities", {}).get("receiver-capability", [])
+        encodings = [cap.split(":")[-1] for cap in caps if "encoding" in cap]
+    return encodings
+
+def choose_encoding(encodings):
+    for preferred in ["cbor", "json", "xml"]:
+        if preferred in encodings:
+            return preferred
+    return None
 
 def main():
     try:
@@ -195,32 +219,24 @@ def main():
 
         # Send GET request to /capabilities resource
         capabilities_response = get_capabilities(capabilities_url)
-        capabilities = capabilities_response
         print(capabilities_response.status_code)
-
-        content_type = capabilities_response.headers.get('Content-Type')
         print("_"*20)
-        print(f"Capabilities discovered through content-type header: {content_type}")
+        print(f"Capabilities discovered through content-type header: {capabilities_response.headers.get('Content-Type')}")
         publisher_print("Body of capabilities response:",args.verbose)
         publisher_print(capabilities_response.text,args.verbose)
         print("_"*20)
 
-        if 'json' in capabilities_response.text:
-            publisher_print("Receiver supports JSON encoding!",args.verbose)    
-        elif 'xml' in capabilities_response.text:
-            publisher_print("Receiver supports XML encoding!",args.verbose)
-        elif cbor_capabilities_check(capabilities, args):
-            publisher_print("Receiver supports CBOR encoding!",args.verbose)
-        if 'json' not in capabilities_response.text and 'xml' not in capabilities_response.text and not cbor_capabilities_check(capabilities, args):
-            publisher_print("Receiver does not support any valid encoding type!",args.verbose)
+        encodings = parse_supported_encodings(capabilities_response)
+        encoding = choose_encoding(encodings)
+        if not encoding:
             raise AssertionError("Receiver does not support any valid encoding type!")
-            
+
+        print(f"Receiver supports: {encodings}, using: {encoding}")
 
         retries = args.num_retries if args.num_retries else 3
 
         while(True and retries >= 0):
             time.sleep(time_interval)
-
             interface_data_yang8343 = fetch_data_new()
             payload = {
                 "ietf-https-notif:notification": {
@@ -230,20 +246,17 @@ def main():
                     }
                 }
             }
-            
             headers = None
-            if 'json' in capabilities.text:
+            if encoding == "json":
                 payload = json.dumps(payload)
                 headers = {'Content-Type': 'application/json'}
-            elif 'xml' in capabilities.text:
-                payload= xmltodict.unparse(payload, full_document=False)
-                with open("data.xml", "w") as f:
-                    f.write(payload)
+            elif encoding == "xml":
+                payload = xmltodict.unparse(payload, full_document=False)
                 headers = {'Content-Type': 'application/xml'}
-            elif cbor_capabilities_check(capabilities, args):
+            elif encoding == "cbor":
                 payload = cbor2.dumps(payload)
                 headers = {'Content-Type': 'application/cbor'}
-            else :
+            else:
                 raise AssertionError("Receiver does not support any valid encoding type!")
 
             notification_response = send_notification(notification_url, payload, headers)
@@ -267,5 +280,5 @@ def main():
         print("\n\nTerminating Publisher\n")
 
 if __name__ == "__main__":
-    main()  
+    main()
 
