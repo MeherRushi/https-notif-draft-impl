@@ -1,6 +1,6 @@
 # Project Overview
 
-This repository implements the [IETF HTTPS Notification draft](https://datatracker.ietf.org/doc/draft-ietf-netconf-https-notif/) using **Python**, with both **Flask** and **FastAPI** frameworks.
+This repository implements the [IETF HTTPS-based Transport for YANG Notifications](https://datatracker.ietf.org/doc/draft-ietf-netconf-https-notif/) using **Python**, with both **Flask** and **FastAPI** frameworks.
 
 ## Draft Overview
 
